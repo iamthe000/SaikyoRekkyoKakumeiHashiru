@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>最強列強革命走る</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Impact', sans-serif; 
+            background: #000; 
+            touch-action: none; 
+        }
+        
+        #game-ui { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            pointer-events: none; 
+        }
+        
+        /* スコア・情報表示 */
+        #score-board {
+            position: absolute; 
+            top: calc(10px + env(safe-area-inset-top)); 
+            left: calc(10px + env(safe-area-inset-left));
+            color: yellow; 
+            font-size: 24px; 
+            text-shadow: 2px 2px 0 #f0f; 
+            z-index: 10; 
+        }
+        #muteki-count { color: cyan; font-size: 20px; }
+        
+        /* オーバーレイ共通 */
+        #start-screen, #game-over-screen, #gacha-screen, #save-load-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: auto; z-index: 20;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            box-sizing: border-box;
+            overflow-y: auto; /* コンテンツが多い場合にスクロール */
+        }
+        
+        h1 { 
+            color: #ff0055; 
+            font-size: 40px; 
+            margin-bottom: 10px; 
+            text-transform: uppercase; 
+            transform: rotate(-2deg); 
+            text-shadow: 4px 4px 0 #fff; 
+            text-align: center;
+        }
+        p { color: white; text-align: center; max-width: 80%; }
+        
+        button {
+            background: linear-gradient(45deg, #ff0, #f0f); border: none; padding: 15px 40px;
+            font-size: 24px; font-weight: bold; color: #000; cursor: pointer; margin-top: 20px;
+            transform: skew(-10deg); box-shadow: 5px 5px 0 #fff;
+        }
+        button:active { transform: skew(-10deg) translate(2px, 2px); box-shadow: 3px 3px 0 #fff; }
+        button:disabled {
+            background: #777;
+            color: #aaa;
+            box-shadow: 5px 5px 0 #555;
+            cursor: not-allowed;
+        }
+
+        /* ガチャ演出用 */
+        #torotuki-container { position: relative; width: 200px; height: 200px; margin-bottom: 20px; }
+        #torotuki-img { width: 100%; height: 100%; object-fit: contain; transition: filter 0.1s; }
+        #pickaxe { 
+            position: absolute; top: -50px; right: -50px; font-size: 60px; 
+            transition: transform 0.3s ease-in; opacity: 0; 
+        }
+        #gacha-info {
+            color: white; font-size: 18px; text-align: center;
+        }
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            /* (中略) */
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        /* データ引き継ぎ用 */
+        #save-load-screen textarea {
+            width: 80%;
+            height: 100px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="game-ui">
+        <div id="score-board">
+            SCORE: <span id="score-val">0</span><br>
+            <span id="muteki-count">無敵ボール: 0個</span>
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1>最強列強<br>革命走る</h1>
+        <p>スワイプ: 移動・ジャンプ・しゃがみ<br>「無敵」を集めろ！（無敵ではない）</p>
+
+        <div style="color: white; margin-top: 15px; font-size: 18px;">
+            <label for="skin-selector">現在の同志 (スキン): </label>
+            <select id="skin-selector" onchange="changeSkin(this.value)" style="font-size: 16px; padding: 5px; background: #333; color: white; border: 2px solid #f0f;">
+                </select>
+        </div>
+        <button onclick="startGame()">革命開始</button>
+        <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ（スキン）</button>
+        <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
+    </div>
+
+    <div id="game-over-screen" class="hidden">
+        <h1 style="color: cyan;">粛清されました</h1>
+        <p>スコア: <span id="final-score">0</span></p>
+        <button onclick="resetGame()">再革命</button>
+        <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ</button>
+    </div>
+
+    <div id="gacha-screen" class="hidden">
+        <h1 style="color: #ffaa00;">同志召喚</h1>
+        <div id="torotuki-container">
+            <img id="torotuki-img" src="" alt="Trotsky Target">
+            <div id="pickaxe">⛏️</div>
+        </div>
+        <div id="gacha-info">
+            <p>1回: 無敵ボール 20個</p>
+            <p>所持: <span id="gacha-muteki-count">0</span>個</p>
+        </div>
+        <div id="gacha-result" style="font-size: 20px; color: yellow; height: 30px;"></div>
+        <button id="gacha-button" onclick="runGacha()">ピッケル投擲 (20個消費)</button>
+        <button onclick="closeGacha()" style="background: #555; font-size: 16px; margin-top: 10px;">戻る</button>
+    </div>
+
+    <div id="save-load-screen" class="hidden">
+        <h1 style="color: #0a0;">データ引き継ぎ</h1>
+        <p>
+            セーブ: 現在のデータをコードとして発行します。<br>
+            ロード: コードを入力してデータを復元します。
+        </p>
+        
+        <button onclick="generateSaveCode()" style="font-size: 18px;">セーブ (コード発行)</button>
+        
+        <textarea id="save-load-code" placeholder="ここに発行されたコードを貼り付け"></textarea>
+        
+        <button onclick="executeLoadCode()" style="background: #00f; color: white; font-size: 18px;">ロード (実行)</button>
+        
+        <button onclick="closeSaveLoadScreen()" style="background: #555; font-size: 16px; margin-top: 10px;">戻る</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 設定・グローバル変数
+        // ==========================================
+        let scene, camera, renderer;
+        let player, playerTexture, textureLoader;
+        let clock, delta;
+        let isPlaying = false;
+        let score = 0;
+        let speed = 15;
+        
+        // --- データ管理 ---
+        let mutekiBalls = 0;
+        let currentSkin = 'player.png';
+        let ownedSkins = new Set(['player.png']); // デフォルトスキン
+        const GACHA_COST = 20;
+        const SKIN_LIST = [
+            'player.png', 'player2.jpg', 'player3.jpg', 'player4.jpg',
+            'player5.jpg', 'player6.jpg', 'player7.jpg', 'player8.jpg'
+        ];
+        const SAVE_DATA_KEY = 'revolutionRunData';
+
+        // レーン設定
+        let currentLane = 0; 
+        const LANE_WIDTH = 2.0; 
+        let targetX = 0;
+
+        // アクション状態
+        let isJumping = false;
+        let isCrouching = false;
+        let jumpVelocity = 0;
+        let gravity = -35;
+        let crouchTimer = 0;
+
+        // オブジェクト管理
+        let obstacles = [];
+        
+        // 画像パス (ガチャのターゲット画像)
+        const TOROTUKI_IMG_SRC = 'torotuki.jpg';
+
+        // ==========================================
+        // 初期化・セットアップ
+        // ==========================================
+        function init() {
+            textureLoader = new THREE.TextureLoader(); // ローダーをグローバルに
+            
+            // シーン
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x110022); 
+            scene.fog = new THREE.FogExp2(0x110022, 0.02);
+
+            // カメラ
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 5, 8);
+            camera.lookAt(0, 0, -5);
+
+            // レンダラー
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // ライト
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            // 床
+            const gridHelper = new THREE.GridHelper(200, 100, 0xff0055, 0x222222);
+            gridHelper.position.y = 0;
+            scene.add(gridHelper);
+
+            // プレイヤー生成
+            createPlayer();
+
+            // ガチャ用画像のセットアップ
+            setupGachaImages();
+
+            // イベントリスナー
+            window.addEventListener('resize', onWindowResize);
+            setupInputs(); 
+
+            // ★ロード処理
+            loadData(); // この中でスキンセレクターUIも更新される
+
+            // ループ開始
+            clock = new THREE.Clock();
+            animate();
+        }
+
+        // プレイヤー作成
+        function createPlayer() {
+            const geometry = new THREE.PlaneGeometry(1.5, 1.5);
+            // マテリアルは後で applySkin で設定する
+            const material = new THREE.MeshBasicMaterial({ 
+                map: null, 
+                transparent: true, 
+                side: THREE.DoubleSide 
+            });
+            player = new THREE.Mesh(geometry, material);
+            player.position.y = 0.75;
+            scene.add(player);
+
+            // ロードしたスキン（またはデフォルト）を適用
+            // loadData() がこの後呼ばれ、正しいスキンが再度適用される
+            applySkin(currentSkin);
+        }
+
+        // スキンを適用する関数
+        function applySkin(skinName) {
+            textureLoader.load(skinName, 
+                (tex) => {
+                    // 成功時: プレイヤーのテクスチャを更新
+                    if (player) { // プレイヤーが存在するか確認
+                        player.material.map = tex;
+                        player.material.needsUpdate = true;
+                    }
+                    currentSkin = skinName; // 現在のスキン名を更新
+                },
+                undefined, // onProgress (今回は不要)
+                (err) => {
+                    // 失敗時: プレースホルダーを生成して適用
+                    console.error('スキン画像の読み込み失敗:', skinName, err);
+                    if (player) { // プレイヤーが存在するか確認
+                        player.material.map = createPlaceholderTexture('#ffffff'); // エラー時は白
+                        player.material.needsUpdate = true;
+                    }
+                }
+            );
+        }
+
+        // 画像がない場合の代替テクスチャ生成
+        function createPlaceholderTexture(color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.arc(64, 64, 60, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'black';
+            ctx.fillRect(40, 45, 15, 25); ctx.fillRect(73, 45, 15, 25);
+            ctx.beginPath(); ctx.arc(64, 85, 20, 0, Math.PI, false); ctx.stroke();
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // 「無敵」ボールのテクスチャ生成
+        function createMutekiTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
+            ctx.beginPath(); ctx.arc(64, 64, 64, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 40px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('無敵', 64, 64);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // ==========================================
+        // ゲームループ
+        // ==========================================
+        function animate() {
+            requestAnimationFrame(animate);
+            delta = clock.getDelta();
+
+            if (isPlaying) {
+                updateGame(delta);
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        function updateGame(dt) {
+            // (中略: ゲームロジックは変更なし)
+            speed += dt * 0.2;
+            score += Math.floor(speed * dt);
+            document.getElementById('score-val').innerText = score;
+
+            player.position.x += (targetX - player.position.x) * 10 * dt;
+
+            if (isJumping) {
+                player.position.y += jumpVelocity * dt;
+                jumpVelocity += gravity * dt;
+                if (player.position.y <= 0.75) {
+                    player.position.y = 0.75;
+                    isJumping = false;
+                    jumpVelocity = 0;
+                }
+            } else if (isCrouching) {
+                player.scale.y = THREE.MathUtils.lerp(player.scale.y, 0.5, 15 * dt);
+                player.position.y = 0.375;
+                crouchTimer -= dt;
+                if (crouchTimer <= 0) {
+                    isCrouching = false;
+                }
+            } else {
+                player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
+                player.position.y = 0.75;
+            }
+
+            player.lookAt(camera.position);
+
+            if (Math.random() < 0.05) {
+                spawnObstacle();
+            }
+
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obj = obstacles[i];
+                obj.position.z += speed * dt;
+
+                if (obj.userData.type === 'ball') {
+                    obj.rotation.y += 5 * dt;
+                    obj.rotation.x += 2 * dt;
+                }
+
+                if (Math.abs(obj.position.z - player.position.z) < 0.8) {
+                    if (Math.abs(obj.position.x - player.position.x) < 1.0) {
+                        checkCollision(obj, i);
+                    }
+                }
+
+                if (obj.position.z > 5) {
+                    scene.remove(obj);
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        // ==========================================
+        // 障害物・アイテム生成
+        // ==========================================
+        function spawnObstacle() {
+            // (中略: 障害物生成ロジックは変更なし)
+            if (obstacles.length > 0) {
+                const lastObj = obstacles[obstacles.length - 1];
+                if (lastObj.position.z > -10) return;
+            }
+
+            const laneIndex = Math.floor(Math.random() * 3) - 1; // -1, 0, 1
+            const posX = laneIndex * LANE_WIDTH;
+            const typeRand = Math.random();
+
+            let mesh;
+            let type = '';
+
+            if (typeRand < 0.2) {
+                const geometry = new THREE.SphereGeometry(0.5, 16, 16);
+                const material = new THREE.MeshBasicMaterial({ map: createMutekiTexture() });
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(posX, 0.5, -50);
+                type = 'ball';
+            } else if (typeRand < 0.5) {
+                const geometry = new THREE.BoxGeometry(2.5, 1.2, 0.5);
+                const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(posX, 0.6, -50);
+                type = 'wall';
+            } else if (typeRand < 0.7) {
+                const geometry = new THREE.CylinderGeometry(1.5, 1.5, 1.0, 16, 1, true, 0, Math.PI);
+                const material = new THREE.MeshStandardMaterial({ color: 0x888888, side: THREE.DoubleSide });
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.rotation.z = Math.PI / 2; 
+                mesh.rotation.y = Math.PI / 2;
+                mesh.position.set(posX, 0.5, -50);
+                type = 'tunnel';
+            } else {
+                const geometry = new THREE.BoxGeometry(1, 4, 1);
+                const material = new THREE.MeshStandardMaterial({ color: 0x5500aa });
+                mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(posX, 2, -50);
+                type = 'pillar';
+            }
+
+            mesh.userData = { type: type, isObstacle: true };
+            scene.add(mesh);
+            obstacles.push(mesh);
+        }
+
+        // ==========================================
+        // 当たり判定ロジック
+        // ==========================================
+        function checkCollision(obj, index) {
+            const type = obj.userData.type;
+
+            if (type === 'ball') {
+                // 無敵ボール取得
+                mutekiBalls++;
+                score += 1000;
+                updateMutekiCountUI(); // UI更新
+                
+                // ★データを自動保存
+                saveData(); 
+                
+                scene.remove(obj);
+                obstacles.splice(index, 1);
+            } else if (type === 'wall') {
+                if (player.position.y < 1.2) {
+                    gameOver();
+                }
+            } else if (type === 'tunnel') {
+                if (!isCrouching) {
+                    gameOver();
+                }
+            } else if (type === 'pillar') {
+                gameOver();
+            }
+        }
+
+        // 無敵ボールのUIを更新する関数
+        function updateMutekiCountUI() {
+            document.getElementById('muteki-count').innerText = `無敵ボール: ${mutekiBalls}個`;
+        }
+
+        // ==========================================
+        // 入力処理 (スマホスワイプ対応)
+        // ==========================================
+        function setupInputs() {
+            // (中略: 入力処理は変更なし)
+            document.addEventListener('keydown', (e) => {
+                if (!isPlaying) return;
+                if (e.code === 'ArrowLeft') moveLane(-1);
+                if (e.code === 'ArrowRight') moveLane(1);
+                if (e.code === 'ArrowUp') doJump();
+                if (e.code === 'ArrowDown') doCrouch();
+            });
+
+            let touchStartX = 0;
+            let touchStartY = 0;
+
+            document.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+
+            document.addEventListener('touchend', (e) => {
+                if (!isPlaying) return;
+                let touchEndX = e.changedTouches[0].clientX;
+                let touchEndY = e.changedTouches[0].clientY;
+                let diffX = touchEndX - touchStartX;
+                let diffY = touchEndY - touchStartY;
+
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    if (Math.abs(diffX) > 30) {
+                        if (diffX > 0) moveLane(1);
+                        else moveLane(-1);
+                    }
+                } 
+                else {
+                    if (Math.abs(diffY) > 30) {
+                        if (diffY < 0) doJump();
+                        else doCrouch();
+                    }
+                }
+            }, false);
+        }
+
+        function moveLane(dir) {
+            currentLane += dir;
+            if (currentLane < -1) currentLane = -1;
+            if (currentLane > 1) currentLane = 1;
+            targetX = currentLane * LANE_WIDTH;
+        }
+
+        function doJump() {
+            if (!isJumping) {
+                isJumping = true;
+                jumpVelocity = 12;
+            }
+        }
+
+        function doCrouch() {
+            if (!isJumping) {
+                isCrouching = true;
+                crouchTimer = 0.8; 
+            }
+        }
+
+        // ==========================================
+        // ゲーム進行管理
+        // ==========================================
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            resetGameVals(); // スコアやスピードはリセット
+            // mutekiBalls と ownedSkins はリセットしない
+            isPlaying = true;
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+        }
+
+        function resetGame() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            resetGameVals();
+            obstacles.forEach(o => scene.remove(o));
+            obstacles = [];
+            isPlaying = true;
+        }
+
+        function resetGameVals() {
+            score = 0;
+            speed = 15;
+            // mutekiBalls はリセットしない
+            currentLane = 0;
+            targetX = 0;
+            player.position.x = 0;
+            document.getElementById('score-val').innerText = '0';
+            updateMutekiCountUI(); // 無敵ボールの数はUIに再反映
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ==========================================
+        // ★★★ スキン選択システム (新規・変更) ★★★
+        // ==========================================
+
+        /**
+         * 保有スキンリスト（ownedSkins）を元に、スキン選択UI（<select>）を更新する
+         */
+        function updateSkinSelectorUI() {
+            const selector = document.getElementById('skin-selector');
+            if (!selector) return; // UIが存在しない場合は終了
+
+            selector.innerHTML = ''; // 中身を一旦クリア
+
+            ownedSkins.forEach(skinName => {
+                const option = document.createElement('option');
+                option.value = skinName;
+                option.innerText = skinName.replace('.png', ''); // (例: player.png -> player)
+                if (skinName === currentSkin) {
+                    option.selected = true; // 現在のスキンを選択状態にする
+                }
+                selector.appendChild(option);
+            });
+        }
+
+        /**
+         * スキンセレクターで選択が変更された時に呼び出される
+         * @param {string} skinName - 選択されたスキンファイル名
+         */
+        function changeSkin(skinName) {
+            if (ownedSkins.has(skinName)) {
+                applySkin(skinName); // プレイヤーモデルに適用 (内部で currentSkin も更新)
+                saveData(); // 選択したスキンを保存
+                console.log(`スキンを ${skinName} に変更しました。`);
+            }
+        }
+
+        // ==========================================
+        // ガチャシステム
+        // ==========================================
+        function setupGachaImages() {
+            const img = document.getElementById('torotuki-img');
+            img.onerror = function() {
+                const c = document.createElement('canvas');
+                c.width = 200; c.height = 200;
+                const x = c.getContext('2d');
+                x.fillStyle = '#ccc'; x.fillRect(0,0,200,200);
+                x.fillStyle = '#000'; x.font = '30px Arial'; x.textAlign = 'center';
+                x.fillText('Target', 100, 100);
+                img.src = c.toDataURL();
+            };
+            img.src = TOROTUKI_IMG_SRC;
+        }
+
+        function openGacha() {
+            document.getElementById('gacha-screen').classList.remove('hidden');
+            document.getElementById('gacha-result').innerText = "";
+            document.getElementById('gacha-muteki-count').innerText = mutekiBalls;
+            
+            // ピッケルリセット
+            const pickaxe = document.getElementById('pickaxe');
+            pickaxe.style.opacity = '0';
+            pickaxe.style.transform = 'translate(0, 0) rotate(0deg)';
+
+            // コストが足りているか確認し、ボタンの有効/無効を切り替え
+            const gachaButton = document.getElementById('gacha-button');
+            if (mutekiBalls >= GACHA_COST) {
+                gachaButton.disabled = false;
+            } else {
+                gachaButton.disabled = true;
+            }
+        }
+
+        function closeGacha() {
+            document.getElementById('gacha-screen').classList.add('hidden');
+        }
+
+        function runGacha() {
+            // コストチェック (二重防止)
+            if (mutekiBalls < GACHA_COST) {
+                document.getElementById('gacha-result').innerText = "無敵ボールが足りません！";
+                return;
+            }
+
+            // ガチャボタンを無効化 (連打防止)
+            const gachaButton = document.getElementById('gacha-button');
+            gachaButton.disabled = true;
+
+            // コスト消費
+            mutekiBalls -= GACHA_COST;
+            updateMutekiCountUI(); // メインUIも更新
+            document.getElementById('gacha-muteki-count').innerText = mutekiBalls; // ガチャ画面のUIも更新
+            
+            const pickaxe = document.getElementById('pickaxe');
+            const imgContainer = document.getElementById('torotuki-container');
+            
+            // アニメーション
+            pickaxe.style.opacity = '1';
+            pickaxe.style.top = '-50px';
+            pickaxe.style.right = '-50px';
+            
+            setTimeout(() => {
+                pickaxe.style.transform = 'translate(-80px, 80px) rotate(-45deg)'; 
+                
+                setTimeout(() => {
+                    imgContainer.classList.add('shake');
+                    
+                    setTimeout(() => {
+                        imgContainer.classList.remove('shake');
+                        
+                        // ★ガチャ抽選ロジック
+                        const newSkin = SKIN_LIST[Math.floor(Math.random() * SKIN_LIST.length)];
+                        let resultText = "";
+
+                        if (ownedSkins.has(newSkin)) {
+                            // 重複
+                            resultText = `同志 [${newSkin}] は既に所持しています`;
+                        } else {
+                            // 新規入手
+                            ownedSkins.add(newSkin);
+                            
+                            // ▼▼▼ 変更 ▼▼▼
+                            // applySkin(newSkin); // スキンを即時適用 <- 削除
+                            updateSkinSelectorUI(); // スキン選択UIを更新する
+                            // ▲▲▲ 変更 ▲▲▲
+                            
+                            resultText = `新規同志 [${newSkin}] を召喚！`;
+                        }
+                        
+                        document.getElementById('gacha-result').innerText = resultText;
+
+                        // ★データを自動保存
+                        saveData();
+
+                        // ボールがまだあるかチェックし、ボタンを再度有効化
+                        if (mutekiBalls >= GACHA_COST) {
+                            gachaButton.disabled = false;
+                        }
+
+                    }, 500);
+                }, 300);
+            }, 100);
+        }
+
+        // ==========================================
+        // データ引き継ぎ (セーブ/ロード)
+        // ==========================================
+
+        function saveData() {
+            try {
+                const data = {
+                    skins: Array.from(ownedSkins), // SetをArrayに変換
+                    balls: mutekiBalls,
+                    skin: currentSkin // ★現在選択中のスキンも保存
+                };
+                localStorage.setItem(SAVE_DATA_KEY, JSON.stringify(data));
+                console.log("データを保存しました。", data);
+            } catch (e) {
+                console.error("セーブに失敗しました。", e);
+            }
+        }
+
+        function loadData() {
+            try {
+                const jsonData = localStorage.getItem(SAVE_DATA_KEY);
+                if (jsonData) {
+                    const data = JSON.parse(jsonData);
+                    
+                    // データをグローバル変数に復元
+                    ownedSkins = new Set(data.skins || ['player.png']); // 念のためデフォルト値
+                    mutekiBalls = data.balls || 0;
+                    currentSkin = data.skin || 'player.png';
+                    
+                    console.log("データをロードしました。", data);
+                    
+                    // UIに反映
+                    updateMutekiCountUI();
+                    if (player) { // プレイヤーが作成済みならスキン適用
+                        applySkin(currentSkin);
+                    }
+                    
+                }
+            } catch (e) {
+                console.error("ロードに失敗しました。", e);
+                // ロード失敗時もデフォルトスキンはSetに入ってる
+            }
+
+            // ★★★ 追加 ★★★
+            // セーブデータの有無に関わらず、必ずスキンセレクタUIを初期化する
+            updateSkinSelectorUI();
+        }
+
+        // --- 引き継ぎ画面UI ---
+        function openSaveLoadScreen() {
+            document.getElementById('save-load-screen').classList.remove('hidden');
+            document.getElementById('save-load-code').value = ''; // テキストエリアをクリア
+        }
+        
+        function closeSaveLoadScreen() {
+            document.getElementById('save-load-screen').classList.add('hidden');
+        }
+
+        // セーブコード（Base64）を発行
+        function generateSaveCode() {
+            saveData(); // 念のため最新のデータをlocalStorageに保存
+            const jsonData = localStorage.getItem(SAVE_DATA_KEY);
+            if (jsonData) {
+                try {
+                    // JSON文字列をBase64にエンコード
+                    const base64Code = btoa(jsonData);
+                    document.getElementById('save-load-code').value = base64Code;
+                    alert("引き継ぎコードを発行しました。テキストエリアのコードをコピーしてください。");
+                } catch (e) {
+                    alert("コードの発行に失敗しました。");
+                }
+            }
+        }
+
+        // ロードコード（Base64）を実行
+        function executeLoadCode() {
+            const base64Code = document.getElementById('save-load-code').value;
+            if (!base64Code) {
+                alert("コードを入力してください。");
+                return;
+            }
+            
+            try {
+                // Base64をデコードしてJSON文字列に戻す
+                const jsonData = atob(base64Code);
+                
+                // 復元できるか確認 (JSON.parse)
+                const data = JSON.parse(jsonData); 
+
+                // 復元成功
+                // localStorageに保存
+                localStorage.setItem(SAVE_DATA_KEY, jsonData);
+                
+                alert("データのロードに成功しました。ゲームを再読み込みします。");
+                location.reload(); // データを確実に反映させるためにリロード
+
+            } catch (e) {
+                console.error("ロード失敗:", e);
+                alert("無効なコードです。データ復元に失敗しました。");
+            }
+        }
+
+        // スタート
+        init();
+
+    </script>
+</body>
+</html>
