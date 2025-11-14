@@ -124,8 +124,8 @@
         <p>スワイプ: 移動・ジャンプ・しゃがみ<br>「無敵」を集めろ！（無敵ではない）</p>
 
         <div style="color: white; margin-top: 15px; font-size: 18px;">
-            <label for="skin-selector">現在の同志 (スキン): </label>
-            <select id="skin-selector" onchange="changeSkin(this.value)" style="font-size: 16px; padding: 5px; background: #333; color: white; border: 2px solid #f0f;">
+            <label>現在の同志 (スキン): </label>
+            <select class="skin-selector" onchange="changeSkin(this.value)" style="font-size: 16px; padding: 5px; background: #333; color: white; border: 2px solid #f0f;">
                 </select>
         </div>
         <button onclick="startGame()">革命開始</button>
@@ -138,7 +138,14 @@
         <p>スコア: <span id="final-score">0</span></p>
         <button onclick="resetGame()">再革命</button>
         <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ</button>
-    </div>
+        
+        <div style="color: white; margin-top: 15px; font-size: 18px;">
+            <label>現在の同志 (スキン): </label>
+            <select class="skin-selector" onchange="changeSkin(this.value)" style="font-size: 16px; padding: 5px; background: #333; color: white; border: 2px solid #f0f;">
+                </select>
+        </div>
+        <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
+        </div>
 
     <div id="gacha-screen" class="hidden">
         <h1 style="color: #ffaa00;">同志召喚</h1>
@@ -568,6 +575,11 @@
             isPlaying = false;
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
+
+            // ▼▼▼ 追加 ▼▼▼
+            // ゲームオーバー画面表示時に、スキンセレクターの状態を最新にする
+            updateSkinSelectorUI();
+            // ▲▲▲ 追加 ▲▲▲
         }
 
         function resetGame() {
@@ -596,28 +608,35 @@
         }
 
         // ==========================================
-        // ★★★ スキン選択システム (新規・変更) ★★★
+        // ★★★ スキン選択システム (変更) ★★★
         // ==========================================
 
         /**
          * 保有スキンリスト（ownedSkins）を元に、スキン選択UI（<select>）を更新する
+         * ▼▼▼ 変更 ▼▼▼ (id検索 -> class検索)
          */
         function updateSkinSelectorUI() {
-            const selector = document.getElementById('skin-selector');
-            if (!selector) return; // UIが存在しない場合は終了
+            // 'skin-selector' クラスを持つすべての <select> 要素を取得
+            const selectors = document.querySelectorAll('.skin-selector');
+            
+            if (selectors.length === 0) return; // UIが存在しない場合は終了
 
-            selector.innerHTML = ''; // 中身を一旦クリア
+            // 取得したすべてのセレクターをループで更新
+            selectors.forEach(selector => {
+                selector.innerHTML = ''; // 中身を一旦クリア
 
-            ownedSkins.forEach(skinName => {
-                const option = document.createElement('option');
-                option.value = skinName;
-                option.innerText = skinName.replace('.png', ''); // (例: player.png -> player)
-                if (skinName === currentSkin) {
-                    option.selected = true; // 現在のスキンを選択状態にする
-                }
-                selector.appendChild(option);
+                ownedSkins.forEach(skinName => {
+                    const option = document.createElement('option');
+                    option.value = skinName;
+                    option.innerText = skinName.replace('.png', '').replace('.jpg', ''); // .jpg も削除
+                    if (skinName === currentSkin) {
+                        option.selected = true; // 現在のスキンを選択状態にする
+                    }
+                    selector.appendChild(option);
+                });
             });
         }
+        // ▲▲▲ 変更 ▲▲▲
 
         /**
          * スキンセレクターで選択が変更された時に呼び出される
@@ -628,6 +647,11 @@
                 applySkin(skinName); // プレイヤーモデルに適用 (内部で currentSkin も更新)
                 saveData(); // 選択したスキンを保存
                 console.log(`スキンを ${skinName} に変更しました。`);
+
+                // ▼▼▼ 追加 ▼▼▼
+                // 他方のセレクターの値も同期させる
+                updateSkinSelectorUI();
+                // ▲▲▲ 追加 ▲▲▲
             }
         }
 
@@ -717,7 +741,7 @@
                             
                             // ▼▼▼ 変更 ▼▼▼
                             // applySkin(newSkin); // スキンを即時適用 <- 削除
-                            updateSkinSelectorUI(); // スキン選択UIを更新する
+                            updateSkinSelectorUI(); // スキン選択UIを更新する (両方)
                             // ▲▲▲ 変更 ▲▲▲
                             
                             resultText = `新規同志 [${newSkin}] を召喚！`;
@@ -781,8 +805,8 @@
                 // ロード失敗時もデフォルトスキンはSetに入ってる
             }
 
-            // ★★★ 追加 ★★★
-            // セーブデータの有無に関わらず、必ずスキンセレクタUIを初期化する
+            // ★★★ 変更 ★★★
+            // セーブデータの有無に関わらず、必ずスキンセレクタUIを初期化する (両方)
             updateSkinSelectorUI();
         }
 
