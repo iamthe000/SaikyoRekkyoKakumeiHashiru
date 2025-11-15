@@ -43,7 +43,7 @@
         }
         #muteki-count { color: cyan; font-size: 20px; }
 
-        /* ▼▼▼ 追加 (一時停止ボタン) ▼▼▼ */
+        /* 一時停止ボタン */
         #pause-button {
             position: absolute;
             top: calc(10px + env(safe-area-inset-top));
@@ -62,9 +62,8 @@
             line-height: 36px;
         }
         
-        /* ▼▼▼ 変更 (一時停止画面を追加) ▼▼▼ */
         /* オーバーレイ共通 */
-        #start-screen, #game-over-screen, #gacha-screen, #save-load-screen, #pause-screen {
+        #start-screen, #game-over-screen, #gacha-screen, #save-load-screen, #pause-screen, #skin-list-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.8);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -126,6 +125,34 @@
             margin-top: 15px;
             font-size: 14px;
         }
+        
+        /* ▼▼▼ 追加 (スキン一覧用) ▼▼▼ */
+        #skin-list-container {
+            width: 80%; max-width: 500px; height: 60vh; 
+            background: #222; border: 2px solid #0ff; 
+            overflow-y: auto; padding: 10px; 
+            box-sizing: border-box; text-align: left;
+        }
+        #skin-list-container h3 {
+            color: white; margin: 15px 0 5px 0;
+            border-bottom: 1px solid #555;
+        }
+        #skin-list-container div {
+            padding: 8px; border-bottom: 1px solid #444; 
+            display: flex; justify-content: space-between; 
+            align-items: center; flex-wrap: wrap;
+        }
+        #skin-list-container .owned {
+            color: #0f0; font-weight: bold; white-space: nowrap; padding-right: 10px;
+        }
+        #skin-list-container .not-owned {
+            color: #888; white-space: nowrap; padding-right: 10px;
+        }
+        #skin-list-container .skin-prob {
+            color: #ff0; font-size: 14px; white-space: nowrap;
+        }
+        /* ▲▲▲ 追加 ▲▲▲ */
+
 
         .hidden { display: none !important; }
     </style>
@@ -150,9 +177,15 @@
             <select class="skin-selector" onchange="changeSkin(this.value)" style="font-size: 16px; padding: 5px; background: #333; color: white; border: 2px solid #f0f;">
                 </select>
         </div>
+        
+        <p style="color: yellow; font-size: 16px; margin-top: 15px; margin-bottom: 0;">
+            最高スコア: <span id="high-score-start">0</span><br>
+            最長距離: <span id="high-distance-start">0</span>m
+        </p>
+        
         <button onclick="startGame()">革命開始</button>
         <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ（スキン）</button>
-        <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
+        <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         
         <button id="bgm-toggle-start" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
         </div>
@@ -161,6 +194,12 @@
         <h1 style="color: cyan;">粛清されました</h1>
         <p>スコア: <span id="final-score">0</span></p>
         <p>走行距離: <span id="final-distance">0</span>m</p>
+        
+        <p style="color: yellow; font-size: 16px;">
+            (最高スコア: <span id="high-score-over">0</span> | 
+            最長距離: <span id="high-distance-over">0</span>m)
+        </p>
+
         <button onclick="resetGame()">再革命</button>
         <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ</button>
         
@@ -169,7 +208,7 @@
             <select class="skin-selector" onchange="changeSkin(this.value)" style="font-size: 16px; padding: 5px; background: #333; color: white; border: 2px solid #f0f;">
                 </select>
         </div>
-        <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
+        <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         
         <button id="bgm-toggle-over" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
         </div>
@@ -211,6 +250,14 @@
         <button onclick="returnToStart()" style="background: #888; color: white; margin-top: 10px; font-size: 18px;">革命を中断 (タイトルへ)</button>
     </div>
 
+    <div id="skin-list-screen" class="hidden">
+        <h1 style="color: #0ff;">同志一覧</h1>
+        <p>所持している同志 (スキン) と、召喚可能な同志の一覧です。</p>
+        <div id="skin-list-container">
+            </div>
+        <button onclick="closeSkinListScreen()" style="background: #555; font-size: 16px; margin-top: 10px;">戻る</button>
+    </div>
+
 
     <audio id="bgm-player" src="bgm.mp3" loop preload="auto"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -223,10 +270,12 @@
         let player, playerTexture, textureLoader;
         let clock, delta;
         let isPlaying = false;
-        let isPaused = false; // ▼▼▼ 追加 (一時停止状態) ▼▼▼
+        let isPaused = false; 
         let score = 0;
         let speed = 15;
         let distance = 0; // 走行距離
+        let highScore = 0; // ▼▼▼ 追加 ▼▼▼
+        let highDistance = 0; // ▼▼▼ 追加 ▼▼▼
 
         // --- データ管理 ---
         let mutekiBalls = 0;
@@ -258,13 +307,12 @@
         // 画像パス (ガチャのターゲット画像)
         const TOROTUKI_IMG_SRC = 'torotuki.jpg';
 
-        // ▼▼▼ BGM用 ▼▼▼
+        // BGM用
         let bgmElement;
-        let isBGMEnabled = false; // ユーザーがONにしたか
+        let isBGMEnabled = false; 
         const BGM_SAVE_KEY = 'revolutionRunBGM';
-        // ▲▲▲ BGM用 ▲▲▲
 
-        // ▼▼▼ ガチャ用レアスキン ▼▼▼
+        // ガチャ用レアスキン
         const RARE_SKINS = [
             { name: 'fuziwara.jpg', rate: 0.005, rarity: "超絶革命" }, // 0.5%
             { name: 'kora_torotuki.png', rate: 0.005, rarity: "超絶革命" }, // 0.5%
@@ -272,13 +320,12 @@
             { name: 'poru.jpg', rate: 0.01, rarity: "超革命的" }, // 1%
             { name: TOROTUKI_IMG_SRC, rate: 0.01, rarity: "革命的" } // 1% (元の1%)
         ];
-        // ▲▲▲ ガチャ用レアスキン ▲▲▲
 
         // ==========================================
         // 初期化・セットアップ
         // ==========================================
         function init() {
-            textureLoader = new THREE.TextureLoader(); // ローダーをグローバルに
+            textureLoader = new THREE.TextureLoader(); 
             
             // シーン
             scene = new THREE.Scene();
@@ -319,15 +366,14 @@
             window.addEventListener('resize', onWindowResize);
             setupInputs(); 
 
-            // ▼▼▼ BGMセットアップ ▼▼▼
+            // BGMセットアップ
             bgmElement = document.getElementById('bgm-player');
-            loadBGMSetting(); // BGM設定のロード (isBGMEnabled が決まる)
+            loadBGMSetting(); 
             updateBGMButtonUI();
-            bgmElement.muted = true; // BGMは最初は常にミュート
-            // ▲▲▲ BGMセットアップ ▲▲▲
+            bgmElement.muted = true; 
 
             // ★ロード処理
-            loadData(); // この中でスキンセレクターUIも更新される
+            loadData(); // この中でスキンセレクターUIとハイスコアUIが更新される
 
             // ループ開始
             clock = new THREE.Clock();
@@ -404,7 +450,6 @@
             requestAnimationFrame(animate);
             delta = clock.getDelta();
 
-            // ▼▼▼ 変更 (一時停止中は update しない) ▼▼▼
             if (isPlaying && !isPaused) {
                 updateGame(delta);
             }
@@ -571,12 +616,11 @@
             document.addEventListener('keydown', (e) => {
                 if (!isPlaying) return;
 
-                // ▼▼▼ 追加 (一時停止キー: P) ▼▼▼
                 if (e.code === 'KeyP' || e.code === 'Escape') {
                     togglePause();
-                    return; // 一時停止中は他の操作を無効化
+                    return; 
                 }
-                if (isPaused) return; // 一時停止中は操作無効
+                if (isPaused) return; 
 
                 if (e.code === 'ArrowLeft') moveLane(-1);
                 if (e.code === 'ArrowRight') moveLane(1);
@@ -588,14 +632,12 @@
             let touchStartY = 0;
 
             document.addEventListener('touchstart', (e) => {
-                // ▼▼▼ 変更 (一時停止中は操作無効) ▼▼▼
                 if (!isPlaying || isPaused) return; 
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             }, { passive: true });
 
             document.addEventListener('touchend', (e) => {
-                // ▼▼▼ 変更 (一時停止中は操作無効) ▼▼▼
                 if (!isPlaying || isPaused) return;
                 let touchEndX = e.changedTouches[0].clientX;
                 let touchEndY = e.changedTouches[0].clientY;
@@ -636,9 +678,9 @@
                 if (jumpVelocity > -15) { 
                     jumpVelocity = -25;
                 }
-            } else { // ★変更点: 'if (!isCrouching)' の条件を外す
+            } else { 
                 isCrouching = true;
-                crouchTimer = 0.8; // これでしゃがみ中にもう一度実行されるとタイマーがリセットされる
+                crouchTimer = 0.8; 
             }
         }
 
@@ -646,9 +688,8 @@
         // ゲーム進行管理
         // ==========================================
 
-        // ▼▼▼ 追加 (一時停止機能) ▼▼▼
         function togglePause() {
-            if (!isPlaying) return; // ゲームが動いていない時は無効
+            if (!isPlaying) return; 
 
             isPaused = !isPaused;
             const pauseScreen = document.getElementById('pause-screen');
@@ -656,15 +697,14 @@
             if (isPaused) {
                 pauseScreen.classList.remove('hidden');
                 if (bgmElement) {
-                    bgmElement.pause(); // BGMを一時停止
+                    bgmElement.pause(); 
                 }
             } else {
                 pauseScreen.classList.add('hidden');
-                playBGM(); // BGMを再開 (playBGM内で isBGMEnabled をチェック)
+                playBGM(); 
             }
         }
 
-        // ▼▼▼ 追加 (タイトルに戻る機能) ▼▼▼
         function returnToStart() {
             document.getElementById('pause-screen').classList.add('hidden');
             document.getElementById('pause-button').classList.add('hidden');
@@ -674,7 +714,7 @@
             
             if (bgmElement) {
                 bgmElement.pause();
-                bgmElement.currentTime = 0; // 曲を最初に戻す
+                bgmElement.currentTime = 0; 
             }
 
             document.getElementById('start-screen').classList.remove('hidden');
@@ -684,6 +724,7 @@
             
             resetGameVals();
             updateSkinSelectorUI();
+            updateHighScoreUI(); // ▼▼▼ 追加 ▼▼▼
         }
 
 
@@ -691,17 +732,29 @@
             document.getElementById('start-screen').classList.add('hidden');
             resetGameVals(); 
             isPlaying = true;
-            playBGM(); // BGM再生開始
-            document.getElementById('pause-button').classList.remove('hidden'); // ▼▼▼ 追加 ▼▼▼
+            playBGM(); 
+            document.getElementById('pause-button').classList.remove('hidden'); 
         }
 
         function gameOver() {
             isPlaying = false;
-            document.getElementById('pause-button').classList.add('hidden'); // ▼▼▼ 追加 ▼▼▼
+            document.getElementById('pause-button').classList.add('hidden'); 
+            
+            // ▼▼▼ 変更 (ハイスコア処理) ▼▼▼
+            if (score > highScore) {
+                highScore = score;
+            }
+            const finalDist = Math.floor(distance);
+            if (finalDist > highDistance) {
+                highDistance = finalDist;
+            }
+            saveData(); // ハイスコア/距離を保存
+            updateHighScoreUI(); // UIを更新
+            // ▲▲▲ 変更 ▲▲▲
             
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
-            document.getElementById('final-distance').innerText = Math.floor(distance);
+            document.getElementById('final-distance').innerText = finalDist;
             updateSkinSelectorUI();
         }
 
@@ -711,8 +764,8 @@
             obstacles.forEach(o => scene.remove(o));
             obstacles = [];
             isPlaying = true;
-            playBGM(); // BGM再生開始
-            document.getElementById('pause-button').classList.remove('hidden'); // ▼▼▼ 追加 ▼▼▼
+            playBGM(); 
+            document.getElementById('pause-button').classList.remove('hidden'); 
         }
 
         function resetGameVals() {
@@ -725,7 +778,7 @@
             
             isJumping = false;
             isCrouching = false;
-            isPaused = false; // ▼▼▼ 追加 ▼▼▼
+            isPaused = false; 
             jumpVelocity = 0;
             crouchTimer = 0;
             
@@ -741,11 +794,10 @@
         }
 
         // ==========================================
-        // ★★★ BGM管理 ★★★
+        // BGM管理
         // ==========================================
 
         function playBGM() {
-            // ▼▼▼ 変更 (一時停止中は再生しない) ▼▼▼
             if (isBGMEnabled && bgmElement && !isPaused) {
                 bgmElement.muted = false; 
                 const promise = bgmElement.play();
@@ -767,7 +819,7 @@
             if (isBGMEnabled) {
                 playBGM(); 
             } else {
-                bgmElement.pause(); // ▼▼▼ 変更 (muteでなくpause) ▼▼▼
+                bgmElement.pause(); 
                 bgmElement.muted = true;
             }
             
@@ -952,6 +1004,85 @@
         }
 
         // ==========================================
+        // ★★★ スキン一覧 & ハイスコアUI ★★★ (新規追加)
+        // ==========================================
+
+        function updateHighScoreUI() {
+            const hsStart = document.getElementById('high-score-start');
+            const hdStart = document.getElementById('high-distance-start');
+            const hsOver = document.getElementById('high-score-over');
+            const hdOver = document.getElementById('high-distance-over');
+            
+            if (hsStart) hsStart.innerText = highScore;
+            if (hdStart) hdStart.innerText = highDistance;
+            if (hsOver) hsOver.innerText = highScore;
+            if (hdOver) hdOver.innerText = highDistance;
+        }
+
+        function openSkinListScreen() {
+            document.getElementById('skin-list-screen').classList.remove('hidden');
+            populateSkinList();
+        }
+
+        function closeSkinListScreen() {
+            document.getElementById('skin-list-screen').classList.add('hidden');
+        }
+
+        function populateSkinList() {
+            const container = document.getElementById('skin-list-container');
+            container.innerHTML = ''; 
+            
+            const defaultSkin = 'player.png';
+            const rareSkinNames = RARE_SKINS.map(s => s.name);
+            // デフォルトでもレアでもないスキンを「一般」とする
+            const normalSkinNames = SKIN_LIST.filter(s => s !== defaultSkin && !rareSkinNames.includes(s));
+
+            let html = '';
+
+            // Default Skin
+            html += `<h3>デフォルト</h3>`;
+            html += createSkinListEntry(defaultSkin, null);
+            
+            // Rare Skins
+            html += `<h3 style="color: #ffaa00;">革命的同志 (レア)</h3>`;
+            RARE_SKINS.forEach(rareInfo => {
+                html += createSkinListEntry(rareInfo.name, rareInfo);
+            });
+
+            // Normal Skins
+            html += `<h3 style="color: #ccc;">一般同志</h3>`;
+            normalSkinNames.forEach(skinName => {
+                html += createSkinListEntry(skinName, null);
+            });
+
+            container.innerHTML = html;
+        }
+
+        function createSkinListEntry(skinName, rareInfo) {
+            const isOwned = ownedSkins.has(skinName);
+            const nameDisplay = skinName.replace('.png', '').replace('.jpg', '');
+            let probabilityText = "";
+
+            if (rareInfo) {
+                let percent = rareInfo.rate * 100; // 0.005 -> 0.5, 0.01 -> 1
+                probabilityText = ` (${rareInfo.rarity}, ${percent}%)`;
+            } else if (skinName !== 'player.png') {
+                probabilityText = " (通常)";
+            } else {
+                probabilityText = " (初期)";
+            }
+            
+            const ownedClass = isOwned ? 'owned' : 'not-owned';
+            const ownedText = isOwned ? '[所持]' : '[未所持]';
+            
+            let entry = `<div>
+                            <span class="${ownedClass}">${ownedText} ${nameDisplay}</span>
+                            <span class="skin-prob">${probabilityText}</span>
+                         </div>`;
+            return entry;
+        }
+
+        // ==========================================
         // データ引き継ぎ (セーブ/ロード)
         // ==========================================
 
@@ -960,7 +1091,9 @@
                 const data = {
                     skins: Array.from(ownedSkins),
                     balls: mutekiBalls,
-                    skin: currentSkin 
+                    skin: currentSkin,
+                    highScore: highScore, // ▼▼▼ 変更 ▼▼▼
+                    highDistance: highDistance // ▼▼▼ 変更 ▼▼▼
                 };
                 localStorage.setItem(SAVE_DATA_KEY, JSON.stringify(data));
                 console.log("データを保存しました。", data);
@@ -978,6 +1111,8 @@
                     ownedSkins = new Set(data.skins || ['player.png']); 
                     mutekiBalls = data.balls || 0;
                     currentSkin = data.skin || 'player.png';
+                    highScore = data.highScore || 0; // ▼▼▼ 変更 ▼▼▼
+                    highDistance = data.highDistance || 0; // ▼▼▼ 変更 ▼▼▼
                     
                     console.log("データをロードしました。", data);
                     
@@ -990,6 +1125,7 @@
                 console.error("ロードに失敗しました。", e);
             }
             updateSkinSelectorUI();
+            updateHighScoreUI(); // ▼▼▼ 変更 (ハイスコアUIもロード時に更新) ▼▼▼
         }
 
         // --- 引き継ぎ画面UI ---
@@ -1003,7 +1139,7 @@
         }
 
         function generateSaveCode() {
-            saveData(); 
+            saveData(); // ★ハイスコアを含めて最新のデータを保存
             const jsonData = localStorage.getItem(SAVE_DATA_KEY);
             if (jsonData) {
                 try {
@@ -1026,9 +1162,14 @@
             try {
                 const jsonData = atob(base64Code);
                 const data = JSON.parse(jsonData); 
-                localStorage.setItem(SAVE_DATA_KEY, jsonData);
-                alert("データのロードに成功しました。ゲームを再読み込みします。");
-                location.reload(); 
+                // 念のため、ロードするデータに必須項目があるか簡易チェック
+                if (data && typeof data.skins !== 'undefined' && typeof data.balls !== 'undefined') {
+                    localStorage.setItem(SAVE_DATA_KEY, jsonData);
+                    alert("データのロードに成功しました。ゲームを再読み込みします。");
+                    location.reload(); 
+                } else {
+                    throw new Error("無効なデータ形式です。");
+                }
             } catch (e) {
                 console.error("ロード失敗:", e);
                 alert("無効なコードです。データ復元に失敗しました。");
