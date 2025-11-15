@@ -187,6 +187,7 @@
     <audio id="bgm-player" src="bgm.mp3" loop preload="auto"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
+
 <script>
         // ==========================================
         // 設定・グローバル変数
@@ -221,7 +222,7 @@
         let isCrouching = false;
         let jumpVelocity = 0;
         let gravity = -35;
-        let crouchTimer = 0; // (この変数は doJump でのリセット用に残す、タイマーとしては使わない)
+        let crouchTimer = 0; // ★ 復活
 
         // オブジェクト管理
         let obstacles = [];
@@ -382,6 +383,7 @@
             renderer.render(scene, camera);
         }
 
+        // ▼▼▼ ここから変更 (updateGame) ▼▼▼
         function updateGame(dt) {
             speed += dt * 0.2;
             score += Math.floor(speed * dt);
@@ -396,28 +398,47 @@
             if (isJumping) {
                 player.position.y += jumpVelocity * dt;
                 jumpVelocity += gravity * dt;
-                player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
 
-                if (player.position.y <= 0.75) {
-                    player.position.y = 0.75;
-                    isJumping = false;
-                    jumpVelocity = 0;
+                // ★変更：しゃがみジャンプかどうかで分岐
+                if (isCrouching) {
+                    // しゃがみジャンプ中
+                    player.scale.y = THREE.MathUtils.lerp(player.scale.y, 0.5, 15 * dt);
+                    // しゃがみ状態での着地判定
+                    if (player.position.y <= 0.375) { 
+                        player.position.y = 0.375;
+                        isJumping = false;
+                        jumpVelocity = 0;
+                        // 着地しても isCrouching はタイマーが切れるまで維持される
+                    }
+                } else {
+                    // 通常ジャンプ中
+                    player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
+                    // 通常状態での着地判定
+                    if (player.position.y <= 0.75) {
+                        player.position.y = 0.75;
+                        isJumping = false;
+                        jumpVelocity = 0;
+                    }
                 }
             
-            // ▼▼▼ ここから変更 ▼▼▼
             } else if (isCrouching) {
+                // 地上でしゃがみ中
                 player.scale.y = THREE.MathUtils.lerp(player.scale.y, 0.5, 15 * dt);
                 player.position.y = 0.375;
-                // crouchTimer -= dt; // タイマー削除
-                // if (crouchTimer <= 0) { // タイマー削除
-                //     isCrouching = false; // タイマー削除 (ジャンプ時に解除される)
-                // } // タイマー削除
-            // ▲▲▲ ここまで変更 ▲▲▲
+                
+                // ★変更：タイマー処理を復活
+                crouchTimer -= dt; 
+                if (crouchTimer <= 0) { 
+                    isCrouching = false; // タイマー切れで立ち上がる
+                }
 
             } else {
+                // 地上で立ち状態
                 player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
                 player.position.y = 0.75;
             }
+            // ▲▲▲ ここまで変更 (updateGame) ▲▲▲
+
 
             player.lookAt(camera.position);
 
@@ -576,29 +597,31 @@
             targetX = currentLane * LANE_WIDTH;
         }
 
+        // ▼▼▼ ここから変更 (doJump) ▼▼▼
         function doJump() {
             if (!isJumping) {
                 isJumping = true;
                 jumpVelocity = 12;
-                isCrouching = false; // ★しゃがみを解除
-                crouchTimer = 0;     // ★タイマーもリセット
+                // ★削除: isCrouching = false; 
+                // ★削除: crouchTimer = 0;     
             }
         }
+        // ▲▲▲ ここまで変更 (doJump) ▲▲▲
 
-        // ▼▼▼ ここから変更 ▼▼▼
+        // ▼▼▼ ここから変更 (doCrouch) ▼▼▼
         function doCrouch() {
             if (isJumping) {
                 // ジャンプ中の場合、急速降下
-                if (jumpVelocity > -15) { // 既にもっと速く落ちていなければ
-                    jumpVelocity = -25; // 強い下向きの速度を与える
+                if (jumpVelocity > -15) { 
+                    jumpVelocity = -25;
                 }
-            } else if (!isCrouching) { // ★変更: 既にしゃがんでいなければ
-                // 地上でのしゃがみ（タイマーなし）
+            } else if (!isCrouching) { 
+                // 地上でのしゃがみ
                 isCrouching = true;
-                // crouchTimer = 0.8; // ★削除 (タイマーを使わない)
+                crouchTimer = 0.8; // ★変更：タイマーをセット
             }
         }
-        // ▲▲▲ ここまで変更 ▲▲▲
+        // ▲▲▲ ここまで変更 (doCrouch) ▲▲▲
 
         // ==========================================
         // ゲーム進行管理
@@ -635,6 +658,12 @@
             currentLane = 0;
             targetX = 0;
             player.position.x = 0;
+            
+            // ★リセット時にアクション状態もクリア
+            isJumping = false;
+            isCrouching = false;
+            jumpVelocity = 0;
+            crouchTimer = 0;
             
             document.getElementById('score-val').innerText = '0';
             document.getElementById('distance-val').innerText = '0';
