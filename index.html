@@ -187,7 +187,7 @@
     <audio id="bgm-player" src="bgm.mp3" loop preload="auto"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-    <script>
+<script>
         // ==========================================
         // 設定・グローバル変数
         // ==========================================
@@ -393,9 +393,14 @@
 
             player.position.x += (targetX - player.position.x) * 10 * dt;
 
+            // ▼▼▼ ここから変更 ▼▼▼
             if (isJumping) {
                 player.position.y += jumpVelocity * dt;
                 jumpVelocity += gravity * dt;
+
+                // ★追加: ジャンプ中は常に立つ（しゃがみからジャンプした時に元に戻すため）
+                player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
+
                 if (player.position.y <= 0.75) {
                     player.position.y = 0.75;
                     isJumping = false;
@@ -412,6 +417,7 @@
                 player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
                 player.position.y = 0.75;
             }
+            // ▲▲▲ ここまで変更 ▲▲▲
 
             player.lookAt(camera.position);
 
@@ -570,19 +576,29 @@
             targetX = currentLane * LANE_WIDTH;
         }
 
+        // ▼▼▼ ここから変更 ▼▼▼
         function doJump() {
             if (!isJumping) {
                 isJumping = true;
                 jumpVelocity = 12;
+                isCrouching = false; // ★追加：しゃがみを解除
+                crouchTimer = 0;     // ★追加：タイマーもリセット
             }
         }
 
         function doCrouch() {
-            if (!isJumping) {
+            if (isJumping) {
+                // ★変更：ジャンプ中の場合、急速降下
+                if (jumpVelocity > -15) { // 既にもっと速く落ちていなければ
+                    jumpVelocity = -25; // 強い下向きの速度を与える
+                }
+            } else {
+                // 元のロジック：地上でのしゃがみ
                 isCrouching = true;
                 crouchTimer = 0.8; 
             }
         }
+        // ▲▲▲ ここまで変更 ▲▲▲
 
         // ==========================================
         // ゲーム進行管理
