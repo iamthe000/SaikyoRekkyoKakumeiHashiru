@@ -42,9 +42,29 @@
             z-index: 10; 
         }
         #muteki-count { color: cyan; font-size: 20px; }
+
+        /* ▼▼▼ 追加 (一時停止ボタン) ▼▼▼ */
+        #pause-button {
+            position: absolute;
+            top: calc(10px + env(safe-area-inset-top));
+            right: calc(10px + env(safe-area-inset-right));
+            font-size: 24px;
+            font-weight: bold;
+            background: #ff0;
+            color: #000;
+            border: 2px solid #fff;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            pointer-events: auto; /* ★重要 */
+            z-index: 15;
+            padding: 0;
+            line-height: 36px;
+        }
         
+        /* ▼▼▼ 変更 (一時停止画面を追加) ▼▼▼ */
         /* オーバーレイ共通 */
-        #start-screen, #game-over-screen, #gacha-screen, #save-load-screen {
+        #start-screen, #game-over-screen, #gacha-screen, #save-load-screen, #pause-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.8);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -118,6 +138,7 @@
             DISTANCE: <span id="distance-val">0</span>m<br>
             <span id="muteki-count">無敵ボール: 0個</span>
         </div>
+        <button id="pause-button" class="hidden" onclick="togglePause()">II</button>
     </div>
 
     <div id="start-screen">
@@ -184,11 +205,17 @@
         <button onclick="closeSaveLoadScreen()" style="background: #555; font-size: 16px; margin-top: 10px;">戻る</button>
     </div>
 
+    <div id="pause-screen" class="hidden">
+        <h1 style="color: #ff0;">一時停止</h1>
+        <button onclick="togglePause()">革命続行</button>
+        <button onclick="returnToStart()" style="background: #888; color: white; margin-top: 10px; font-size: 18px;">革命を中断 (タイトルへ)</button>
+    </div>
+
+
     <audio id="bgm-player" src="bgm.mp3" loop preload="auto"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-
-<script>
+    <script>
         // ==========================================
         // 設定・グローバル変数
         // ==========================================
@@ -196,6 +223,7 @@
         let player, playerTexture, textureLoader;
         let clock, delta;
         let isPlaying = false;
+        let isPaused = false; // ▼▼▼ 追加 (一時停止状態) ▼▼▼
         let score = 0;
         let speed = 15;
         let distance = 0; // 走行距離
@@ -222,7 +250,7 @@
         let isCrouching = false;
         let jumpVelocity = 0;
         let gravity = -35;
-        let crouchTimer = 0; // ★ 復活
+        let crouchTimer = 0;
 
         // オブジェクト管理
         let obstacles = [];
@@ -376,14 +404,14 @@
             requestAnimationFrame(animate);
             delta = clock.getDelta();
 
-            if (isPlaying) {
+            // ▼▼▼ 変更 (一時停止中は update しない) ▼▼▼
+            if (isPlaying && !isPaused) {
                 updateGame(delta);
             }
             
             renderer.render(scene, camera);
         }
 
-        // ▼▼▼ ここから変更 (updateGame) ▼▼▼
         function updateGame(dt) {
             speed += dt * 0.2;
             score += Math.floor(speed * dt);
@@ -399,21 +427,15 @@
                 player.position.y += jumpVelocity * dt;
                 jumpVelocity += gravity * dt;
 
-                // ★変更：しゃがみジャンプかどうかで分岐
                 if (isCrouching) {
-                    // しゃがみジャンプ中
                     player.scale.y = THREE.MathUtils.lerp(player.scale.y, 0.5, 15 * dt);
-                    // しゃがみ状態での着地判定
                     if (player.position.y <= 0.375) { 
                         player.position.y = 0.375;
                         isJumping = false;
                         jumpVelocity = 0;
-                        // 着地しても isCrouching はタイマーが切れるまで維持される
                     }
                 } else {
-                    // 通常ジャンプ中
                     player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
-                    // 通常状態での着地判定
                     if (player.position.y <= 0.75) {
                         player.position.y = 0.75;
                         isJumping = false;
@@ -422,23 +444,17 @@
                 }
             
             } else if (isCrouching) {
-                // 地上でしゃがみ中
                 player.scale.y = THREE.MathUtils.lerp(player.scale.y, 0.5, 15 * dt);
                 player.position.y = 0.375;
-                
-                // ★変更：タイマー処理を復活
                 crouchTimer -= dt; 
                 if (crouchTimer <= 0) { 
-                    isCrouching = false; // タイマー切れで立ち上がる
+                    isCrouching = false;
                 }
 
             } else {
-                // 地上で立ち状態
                 player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
                 player.position.y = 0.75;
             }
-            // ▲▲▲ ここまで変更 (updateGame) ▲▲▲
-
 
             player.lookAt(camera.position);
 
@@ -554,6 +570,14 @@
         function setupInputs() {
             document.addEventListener('keydown', (e) => {
                 if (!isPlaying) return;
+
+                // ▼▼▼ 追加 (一時停止キー: P) ▼▼▼
+                if (e.code === 'KeyP' || e.code === 'Escape') {
+                    togglePause();
+                    return; // 一時停止中は他の操作を無効化
+                }
+                if (isPaused) return; // 一時停止中は操作無効
+
                 if (e.code === 'ArrowLeft') moveLane(-1);
                 if (e.code === 'ArrowRight') moveLane(1);
                 if (e.code === 'ArrowUp') doJump();
@@ -564,12 +588,15 @@
             let touchStartY = 0;
 
             document.addEventListener('touchstart', (e) => {
+                // ▼▼▼ 変更 (一時停止中は操作無効) ▼▼▼
+                if (!isPlaying || isPaused) return; 
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             }, { passive: true });
 
             document.addEventListener('touchend', (e) => {
-                if (!isPlaying) return;
+                // ▼▼▼ 変更 (一時停止中は操作無効) ▼▼▼
+                if (!isPlaying || isPaused) return;
                 let touchEndX = e.changedTouches[0].clientX;
                 let touchEndY = e.changedTouches[0].clientY;
                 let diffX = touchEndX - touchStartX;
@@ -597,45 +624,81 @@
             targetX = currentLane * LANE_WIDTH;
         }
 
-        // ▼▼▼ ここから変更 (doJump) ▼▼▼
         function doJump() {
             if (!isJumping) {
                 isJumping = true;
                 jumpVelocity = 12;
-                // ★削除: isCrouching = false; 
-                // ★削除: crouchTimer = 0;     
             }
         }
-        // ▲▲▲ ここまで変更 (doJump) ▲▲▲
 
-        // ▼▼▼ ここから変更 (doCrouch) ▼▼▼
         function doCrouch() {
             if (isJumping) {
-                // ジャンプ中の場合、急速降下
                 if (jumpVelocity > -15) { 
                     jumpVelocity = -25;
                 }
             } else if (!isCrouching) { 
-                // 地上でのしゃがみ
                 isCrouching = true;
-                crouchTimer = 0.8; // ★変更：タイマーをセット
+                crouchTimer = 0.8; 
             }
         }
-        // ▲▲▲ ここまで変更 (doCrouch) ▲▲▲
 
         // ==========================================
         // ゲーム進行管理
         // ==========================================
+
+        // ▼▼▼ 追加 (一時停止機能) ▼▼▼
+        function togglePause() {
+            if (!isPlaying) return; // ゲームが動いていない時は無効
+
+            isPaused = !isPaused;
+            const pauseScreen = document.getElementById('pause-screen');
+
+            if (isPaused) {
+                pauseScreen.classList.remove('hidden');
+                if (bgmElement) {
+                    bgmElement.pause(); // BGMを一時停止
+                }
+            } else {
+                pauseScreen.classList.add('hidden');
+                playBGM(); // BGMを再開 (playBGM内で isBGMEnabled をチェック)
+            }
+        }
+
+        // ▼▼▼ 追加 (タイトルに戻る機能) ▼▼▼
+        function returnToStart() {
+            document.getElementById('pause-screen').classList.add('hidden');
+            document.getElementById('pause-button').classList.add('hidden');
+            
+            isPlaying = false;
+            isPaused = false;
+            
+            if (bgmElement) {
+                bgmElement.pause();
+                bgmElement.currentTime = 0; // 曲を最初に戻す
+            }
+
+            document.getElementById('start-screen').classList.remove('hidden');
+            
+            obstacles.forEach(o => scene.remove(o));
+            obstacles = [];
+            
+            resetGameVals();
+            updateSkinSelectorUI();
+        }
+
+
         function startGame() {
             document.getElementById('start-screen').classList.add('hidden');
             resetGameVals(); 
             isPlaying = true;
             playBGM(); // BGM再生開始
+            document.getElementById('pause-button').classList.remove('hidden'); // ▼▼▼ 追加 ▼▼▼
         }
 
         function gameOver() {
             isPlaying = false;
-            // stopBGM(); // BGMは止めない
+            document.getElementById('pause-button').classList.add('hidden'); // ▼▼▼ 追加 ▼▼▼
+            
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
             document.getElementById('final-distance').innerText = Math.floor(distance);
@@ -649,6 +712,7 @@
             obstacles = [];
             isPlaying = true;
             playBGM(); // BGM再生開始
+            document.getElementById('pause-button').classList.remove('hidden'); // ▼▼▼ 追加 ▼▼▼
         }
 
         function resetGameVals() {
@@ -659,9 +723,9 @@
             targetX = 0;
             player.position.x = 0;
             
-            // ★リセット時にアクション状態もクリア
             isJumping = false;
             isCrouching = false;
+            isPaused = false; // ▼▼▼ 追加 ▼▼▼
             jumpVelocity = 0;
             crouchTimer = 0;
             
@@ -677,18 +741,17 @@
         }
 
         // ==========================================
-        // ★★★ BGM管理 (追加) ★★★
+        // ★★★ BGM管理 ★★★
         // ==========================================
 
         function playBGM() {
-            if (isBGMEnabled && bgmElement) {
-                bgmElement.muted = false; // ミュート解除
-                // ブラウザの自動再生ポリシー対策
+            // ▼▼▼ 変更 (一時停止中は再生しない) ▼▼▼
+            if (isBGMEnabled && bgmElement && !isPaused) {
+                bgmElement.muted = false; 
                 const promise = bgmElement.play();
                 if (promise !== undefined) {
                     promise.catch(error => {
                         console.warn("BGMの自動再生がブロックされました。", error);
-                        // 失敗したら、設定をOFFに戻す
                         isBGMEnabled = false; 
                         bgmElement.muted = true;
                         saveBGMSetting();
@@ -702,10 +765,9 @@
             isBGMEnabled = !isBGMEnabled;
             
             if (isBGMEnabled) {
-                // ユーザーがONにした瞬間に再生を試みる
                 playBGM(); 
             } else {
-                // OFFにした場合
+                bgmElement.pause(); // ▼▼▼ 変更 (muteでなくpause) ▼▼▼
                 bgmElement.muted = true;
             }
             
@@ -715,7 +777,7 @@
 
         function updateBGMButtonUI() {
             const text = isBGMEnabled ? "BGM: ON" : "BGM: OFF";
-            const color = isBGMEnabled ? "linear-gradient(45deg, #0f0, #0a0)" : "#444"; // ONの時緑に
+            const color = isBGMEnabled ? "linear-gradient(45deg, #0f0, #0a0)" : "#444"; 
             
             const btn1 = document.getElementById('bgm-toggle-start');
             if (btn1) {
@@ -844,15 +906,12 @@
                     setTimeout(() => {
                         imgContainer.classList.remove('shake');
                         
-                        // ▼▼▼ 変更 (ガチャ抽選ロジック) ▼▼▼
-                        
                         let newSkin = "";
                         let resultText = "";
                         let hit = false;
                         const rand = Math.random();
                         let cumulativeRate = 0.0;
 
-                        // レアスキン抽選 (RARE_SKINS配列順)
                         for (const rare of RARE_SKINS) {
                             cumulativeRate += rare.rate;
                             if (rand < cumulativeRate) {
@@ -861,30 +920,26 @@
                                     resultText = `★${rare.rarity}!!★ [${newSkin}] は既に所持しています`;
                                 } else {
                                     ownedSkins.add(newSkin);
-                                    updateSkinSelectorUI(); // スキン選択UIを更新
+                                    updateSkinSelectorUI(); 
                                     resultText = `★★★${rare.rarity}同志 [${newSkin}] を召喚!!!★★★`;
                                 }
                                 hit = true;
-                                break; // ヒットしたらループ終了
+                                break; 
                             }
                         }
 
-                        // 通常抽選 (レアにヒットしなかった場合)
                         if (!hit) {
                             newSkin = SKIN_LIST[Math.floor(Math.random() * SKIN_LIST.length)];
                             if (ownedSkins.has(newSkin)) {
                                 resultText = `同志 [${newSkin}] は既に所持しています`;
                             } else {
                                 ownedSkins.add(newSkin);
-                                updateSkinSelectorUI(); // スキン選択UIを更新
+                                updateSkinSelectorUI(); 
                                 resultText = `新規同志 [${newSkin}] を召喚！`;
                             }
                         }
                         
                         document.getElementById('gacha-result').innerText = resultText;
-
-                        // ▲▲▲ 変更 ▲▲▲
-
                         saveData();
 
                         if (mutekiBalls >= GACHA_COST) {
