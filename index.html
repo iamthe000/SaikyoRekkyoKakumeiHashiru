@@ -636,9 +636,9 @@
                 if (jumpVelocity > -15) { 
                     jumpVelocity = -25;
                 }
-            } else if (!isCrouching) { 
+            } else { // ★変更点: 'if (!isCrouching)' の条件を外す
                 isCrouching = true;
-                crouchTimer = 0.8; 
+                crouchTimer = 0.8; // これでしゃがみ中にもう一度実行されるとタイマーがリセットされる
             }
         }
 
