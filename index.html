@@ -63,9 +63,7 @@
         }
         
         /* オーバーレイ共通 */
-        /* ▼▼▼ 追加 ▼▼▼ (id="custom-skin-screen" を追加) */
         #start-screen, #game-over-screen, #gacha-screen, #save-load-screen, #pause-screen, #skin-list-screen, #custom-skin-screen {
-        /* ▲▲▲ 追加 ▲▲▲ */
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.8);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -128,7 +126,6 @@
             font-size: 14px;
         }
         
-        /* ▼▼▼ 変更 (スキン一覧用) ▼▼▼ */
         #skin-list-container {
             width: 80%; max-width: 500px; height: 60vh; 
             background: #222; border: 2px solid #0ff; 
@@ -153,7 +150,6 @@
         #skin-list-container .skin-prob {
             color: #ff0; font-size: 14px; white-space: nowrap;
         }
-        /* ▲▲▲ 変更 ▲▲▲ */
 
 
         .hidden { display: none !important; }
@@ -161,6 +157,7 @@
 </head>
 <body>
 
+    <img id="custom-skin-gif-source" style="display: none;" crossOrigin="anonymous">
     <div id="game-ui">
         <div id="score-board">
             SCORE: <span id="score-val">0</span><br>
@@ -189,6 +186,7 @@
         <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ（スキン）</button>
         <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         <button onclick="openCustomSkinScreen()" style="background: #0f0; color: #000; margin-top: 10px; font-size: 16px;">オリジナル同志作成</button>
+        
         <button id="bgm-toggle-start" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
         </div>
 
@@ -212,6 +210,7 @@
         </div>
         <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         <button onclick="openCustomSkinScreen()" style="background: #0f0; color: #000; margin-top: 10px; font-size: 16px;">オリジナル同志作成</button>
+        
         <button id="bgm-toggle-over" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
         </div>
 
@@ -273,8 +272,7 @@
             ・引き継ぎやキャッシュクリア後は、再度アップロードが必要です。
         </p>
         
-        <input type="file" id="custom-skin-upload" accept="image/png, image/jpeg" style="margin-top: 20px; color: white; font-size: 16px;">
-        
+        <input type="file" id="custom-skin-upload" accept="image/png, image/jpeg, image/gif" style="margin-top: 20px; color: white; font-size: 16px;">
         <div style="margin-top: 15px;">
             <img id="custom-skin-preview" src="" alt="Preview" style="max-width: 150px; max-height: 150px; border: 2px solid #555; background: #333; display: none;">
         </div>
@@ -282,6 +280,8 @@
         <button id="custom-skin-save" onclick="saveCustomSkin()" style="font-size: 18px;" disabled>この同志で決定</button>
         <button onclick="closeCustomSkinScreen()" style="background: #555; font-size: 16px; margin-top: 10px;">戻る</button>
     </div>
+
+
     <audio id="bgm-player" src="bgm.mp3" loop preload="auto"></audio>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
@@ -310,11 +310,14 @@
         ];
         const SAVE_DATA_KEY = 'revolutionRunData';
 
-        // ▼▼▼ 追加 (カスタムスキン用) ▼▼▼
+        // ▼▼▼ 追加/変更 (カスタムスキン用) ▼▼▼
         const CUSTOM_SKIN_ID = 'custom_skin.png'; // カスタムスキンの内部ID
-        const CUSTOM_SKIN_KEY = 'revolutionRunCustomSkin'; // localStorageキー
+        const CUSTOM_SKIN_KEY = 'revolutionRunCustomSkin'; // localStorageキー (DataURL)
+        const CUSTOM_SKIN_TYPE_KEY = 'revolutionRunCustomSkinType'; // ( 'static' or 'gif' )
         let customSkinDataURL = null; // カスタムスキンのData URLを保持
-        // ▲▲▲ 追加 ▲▲▲
+        let isCustomSkinAnimated = false; // カスタムスキンがGIFかどうか
+        let customSkinGifElement; // GIFアニメーション用の <img> 要素
+        // ▲▲▲ 追加/変更 ▲▲▲
 
         // レーン設定
         let currentLane = 0; 
@@ -389,9 +392,10 @@
             // ガチャ用画像のセットアップ
             setupGachaImages();
 
-            // ▼▼▼ 追加 ▼▼▼
+            // ▼▼▼ 追加/変更 ▼▼▼
             setupCustomSkinUploader();
-            // ▲▲▲ 追加 ▲▲▲
+            customSkinGifElement = document.getElementById('custom-skin-gif-source');
+            // ▲▲▲ 追加/変更 ▲▲▲
 
             // イベントリスナー
             window.addEventListener('resize', onWindowResize);
@@ -425,43 +429,77 @@
             applySkin(currentSkin);
         }
 
+        // ▼▼▼ 変更 (GIF対応のため applySkin を大幅に変更) ▼▼▼
         // スキンを適用する関数
         function applySkin(skinName) {
             
-            // ▼▼▼ 変更 (カスタムスキン対応) ▼▼▼
-            let loadSource = skinName;
-            
-            if (skinName === CUSTOM_SKIN_ID && customSkinDataURL) {
-                // カスタムスキンIDで、かつDataURLがロードされている場合
-                loadSource = customSkinDataURL;
-            } else if (skinName === CUSTOM_SKIN_ID && !customSkinDataURL) {
-                // カスタムスキンが選ばれているが、DataURLがない (キャッシュクリアなど)
-                console.warn("カスタムスキンが選択されていますが、データが見つかりません。デフォルトに戻します。");
-                applySkin('player.png'); // デフォルトスキンを適用
-                currentSkin = 'player.png'; // currentSkinもリセット
-                return;
-            }
-            // ▲▲▲ 変更 ▲▲▲
-
-            textureLoader.load(loadSource, // skinName -> loadSource に変更
-                (tex) => {
-                    if (player) {
-                        player.material.map = tex;
-                        player.material.needsUpdate = true;
-                    }
-                    currentSkin = skinName; 
-                },
-                undefined, 
-                (err) => {
-                    console.error('スキン画像の読み込み失敗:', skinName, err);
-                    // 読み込み失敗時 (カスタムスキンが壊れた場合なども含む)
-                    if (player) {
-                        player.material.map = createPlaceholderTexture('#ffffff');
-                        player.material.needsUpdate = true;
-                    }
+            const onTextureError = (err) => {
+                console.error('スキン画像の読み込み失敗:', skinName, err);
+                if (player) {
+                    player.material.map = createPlaceholderTexture('#ffffff');
+                    player.material.needsUpdate = true;
                 }
-            );
+            };
+
+            if (skinName === CUSTOM_SKIN_ID) {
+                // --- カスタムスキンの場合 ---
+                if (isCustomSkinAnimated && customSkinDataURL) {
+                    // 1. アニメーションGIF の場合
+                    try {
+                        // <img> 要素のsrcをセット
+                        if (customSkinGifElement.src !== customSkinDataURL) {
+                            customSkinGifElement.src = customSkinDataURL;
+                        }
+                        
+                        // <img> 要素から新しいTextureを作成
+                        const gifTexture = new THREE.Texture(customSkinGifElement);
+                        gifTexture.needsUpdate = true; // 最初のフレームをアップロード
+                        
+                        if (player) {
+                            player.material.map = gifTexture;
+                            player.material.needsUpdate = true;
+                        }
+                        currentSkin = skinName;
+
+                    } catch (e) {
+                        onTextureError(e);
+                    }
+                } else if (customSkinDataURL) {
+                    // 2. 静止画 (PNG/JPG) の場合
+                    textureLoader.load(customSkinDataURL, 
+                        (tex) => {
+                            if (player) {
+                                player.material.map = tex;
+                                player.material.needsUpdate = true;
+                            }
+                            currentSkin = skinName; 
+                        },
+                        undefined, 
+                        onTextureError
+                    );
+                } else {
+                    // 3. データが失われている場合
+                    console.warn("カスタムスキンが選択されていますが、データが見つかりません。デフォルトに戻します。");
+                    applySkin('player.png'); // デフォルトスキンを適用
+                    currentSkin = 'player.png'; // currentSkinもリセット
+                    return;
+                }
+            } else {
+                // --- 通常のスキンの場合 ---
+                textureLoader.load(skinName, 
+                    (tex) => {
+                        if (player) {
+                            player.material.map = tex;
+                            player.material.needsUpdate = true;
+                        }
+                        currentSkin = skinName; 
+                    },
+                    undefined, 
+                    onTextureError
+                );
+            }
         }
+        // ▲▲▲ 変更 ▲▲▲
 
         // 画像がない場合の代替テクスチャ生成
         function createPlaceholderTexture(color) {
@@ -502,6 +540,13 @@
                 updateGame(delta);
             }
             
+            // ▼▼▼ 追加 (GIFアニメーションの更新) ▼▼▼
+            if (currentSkin === CUSTOM_SKIN_ID && isCustomSkinAnimated && player.material.map) {
+                // GIFが設定されている場合、毎フレームテクスチャを更新
+                player.material.map.needsUpdate = true;
+            }
+            // ▲▲▲ 追加 ▲▲▲
+
             renderer.render(scene, camera);
         }
 
@@ -924,13 +969,11 @@
                     const option = document.createElement('option');
                     option.value = skinName;
                     
-                    // ▼▼▼ 変更 (カスタムスキン名対応) ▼▼▼
                     if (skinName === CUSTOM_SKIN_ID) {
                         option.innerText = 'オリジナル同志';
                     } else {
                         option.innerText = skinName.replace('.png', '').replace('.jpg', ''); 
                     }
-                    // ▲▲▲ 変更 ▲▲▲
 
                     if (skinName === currentSkin) {
                         option.selected = true;
@@ -1088,17 +1131,14 @@
             
             const defaultSkin = 'player.png';
             const rareSkinNames = RARE_SKINS.map(s => s.name);
-            // ▼▼▼ 変更 (カスタムスキンを除外) ▼▼▼
             const normalSkinNames = SKIN_LIST.filter(s => s !== defaultSkin && !rareSkinNames.includes(s) && s !== CUSTOM_SKIN_ID);
 
             let html = '';
             
-            // ▼▼▼ 追加 (カスタムスキン) ▼▼▼
             if (ownedSkins.has(CUSTOM_SKIN_ID)) {
                 html += `<h3 style="color: #0f0;">オリジナル同志</h3>`;
                 html += createSkinListEntry(CUSTOM_SKIN_ID, null);
             }
-            // ▲▲▲ 追加 ▲▲▲
 
             // Default Skin
             html += `<h3>デフォルト</h3>`;
@@ -1122,12 +1162,10 @@
         function createSkinListEntry(skinName, rareInfo) {
             const isOwned = ownedSkins.has(skinName);
 
-            // ▼▼▼ 変更 (カスタムスキン名対応) ▼▼▼
             let nameDisplay = skinName.replace('.png', '').replace('.jpg', '');
             if (skinName === CUSTOM_SKIN_ID) {
                 nameDisplay = 'オリジナル同志';
             }
-            // ▲▲▲ 変更 ▲▲▲
 
             let probabilityText = "";
 
@@ -1135,11 +1173,10 @@
                 let percent = rareInfo.rate * 100; // 0.005 -> 0.5, 0.01 -> 1
                 probabilityText = ` (${rareInfo.rarity}, ${percent}%)`;
             
-            // ▼▼▼ 追加 (カスタムスキン) ▼▼▼
             } else if (skinName === CUSTOM_SKIN_ID) {
-                probabilityText = " (カスタム)";
-            // ▲▲▲ 追加 ▲▲▲
-
+                // ▼▼▼ 変更 (GIF対応) ▼▼▼
+                probabilityText = isCustomSkinAnimated ? " (カスタム, GIF)" : " (カスタム)";
+                // ▲▲▲ 変更 ▲▲▲
             } else if (skinName !== 'player.png') {
                 probabilityText = " (通常)";
             } else {
@@ -1157,7 +1194,7 @@
         }
 
         // ==========================================
-        // ★★★ カスタムスキン機能 ★★★ (新規追加)
+        // ★★★ カスタムスキン機能 ★★★ (GIF対応)
         // ==========================================
 
         function setupCustomSkinUploader() {
@@ -1168,6 +1205,10 @@
             uploader.addEventListener('change', (event) => {
                 const file = event.target.files[0];
                 if (file) {
+                    // ▼▼▼ 追加 (ファイルタイプをボタンに保存) ▼▼▼
+                    saveButton.dataset.fileType = file.type; // e.g., 'image/gif'
+                    // ▲▲▲ 追加 ▲▲▲
+
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         preview.src = e.target.result;
@@ -1179,6 +1220,7 @@
                     preview.src = '';
                     preview.style.display = 'none';
                     saveButton.disabled = true;
+                    saveButton.dataset.fileType = ''; // ▼ 追加
                 }
             });
         }
@@ -1189,6 +1231,7 @@
             document.getElementById('custom-skin-upload').value = null;
             document.getElementById('custom-skin-preview').style.display = 'none';
             document.getElementById('custom-skin-save').disabled = true;
+            document.getElementById('custom-skin-save').dataset.fileType = '';
         }
 
         function closeCustomSkinScreen() {
@@ -1197,13 +1240,28 @@
 
         function saveCustomSkin() {
             const preview = document.getElementById('custom-skin-preview');
+            const saveButton = document.getElementById('custom-skin-save');
             const dataURL = preview.src;
+            // ▼▼▼ 変更 (ファイルタイプを取得) ▼▼▼
+            const fileType = saveButton.dataset.fileType; 
+            // ▲▲▲ 変更 ▲▲▲
 
             if (dataURL) {
                 try {
                     // カスタムスキンを専用キーでlocalStorageに保存
                     localStorage.setItem(CUSTOM_SKIN_KEY, dataURL);
                     customSkinDataURL = dataURL; 
+                    
+                    // ▼▼▼ 追加 (ファイルタイプも保存) ▼▼▼
+                    if (fileType === 'image/gif') {
+                        localStorage.setItem(CUSTOM_SKIN_TYPE_KEY, 'gif');
+                        isCustomSkinAnimated = true;
+                        customSkinGifElement.src = dataURL; // <img>要素にすぐ反映
+                    } else {
+                        localStorage.setItem(CUSTOM_SKIN_TYPE_KEY, 'static');
+                        isCustomSkinAnimated = false;
+                    }
+                    // ▲▲▲ 追加 ▲▲▲
                     
                     if (!ownedSkins.has(CUSTOM_SKIN_ID)) {
                         ownedSkins.add(CUSTOM_SKIN_ID);
@@ -1265,17 +1323,28 @@
                 console.error("ロードに失敗しました。", e);
             }
 
-            // ▼▼▼ 変更 (カスタムスキンデータのロード処理) ▼▼▼
+            // ▼▼▼ 変更 (カスタムスキンタイプ(GIF)のロード処理) ▼▼▼
             // 2. カスタムスキンデータをロード
             try {
                 const customData = localStorage.getItem(CUSTOM_SKIN_KEY);
+                const customType = localStorage.getItem(CUSTOM_SKIN_TYPE_KEY); // タイプを取得
+
                 if (customData) {
                     // カスタムスキンデータ(DataURL)が存在する場合
                     customSkinDataURL = customData;
                     ownedSkins.add(CUSTOM_SKIN_ID); // 所有リストに強制追加
+                    
+                    if (customType === 'gif') {
+                        isCustomSkinAnimated = true;
+                        customSkinGifElement.src = customSkinDataURL; // <img>にセット
+                    } else {
+                        isCustomSkinAnimated = false;
+                    }
+
                 } else {
                     // カスタムスキンデータが存在しない場合 (キャッシュクリアなど)
                     customSkinDataURL = null;
+                    isCustomSkinAnimated = false; // リセット
                     ownedSkins.delete(CUSTOM_SKIN_ID); // 所有リストから削除
                     if (currentSkin === CUSTOM_SKIN_ID) {
                         currentSkin = 'player.png'; // デフォルトに戻す
@@ -1283,7 +1352,9 @@
                 }
             } catch (e) {
                 console.error("カスタムスキンのロードに失敗", e);
+                isCustomSkinAnimated = false;
             }
+            // ▲▲▲ 変更 ▲▲▲
 
             // 3. 最終的なスキンを適用
             if (player) { 
@@ -1293,7 +1364,6 @@
             // 4. UIを更新
             updateSkinSelectorUI();
             updateHighScoreUI(); 
-            // ▲▲▲ 変更 ▲▲▲
         }
 
         // --- 引き継ぎ画面UI ---
@@ -1335,7 +1405,7 @@
                     // メインデータのみを保存
                     localStorage.setItem(SAVE_DATA_KEY, jsonData);
                     
-                    // ★重要: カスタムスキンデータ(CUSTOM_SKIN_KEY)は上書きしない
+                    // ★重要: カスタムスキンデータ(KEY/TYPE_KEY)は上書きしない
                     
                     alert("データのロードに成功しました。ゲームを再読み込みします。");
                     location.reload(); 
