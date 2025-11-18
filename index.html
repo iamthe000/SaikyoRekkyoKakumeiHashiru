@@ -366,6 +366,7 @@
 
         // オブジェクト管理
         let obstacles = [];
+        let lastObstacleTypes = []; // 障害物生成の履歴
         
         // 画像パス (ガチャのターゲット画像)
         const TOROTUKI_IMG_SRC = 'torotuki.jpg';
@@ -668,7 +669,12 @@
 
             const laneIndex = Math.floor(Math.random() * 3) - 1; // -1, 0, 1
             const posX = laneIndex * LANE_WIDTH;
-            const typeRand = Math.random();
+            let typeRand = Math.random();
+
+            // 3連続で紫の壁(pillar)が出現するのを防ぐ
+            if (lastObstacleTypes.length === 2 && lastObstacleTypes.every(t => t === 'pillar')) {
+                typeRand = Math.random() * 0.7; // pillarでない障害物を強制的に生成
+            }
 
             let mesh;
             let type = '';
@@ -699,6 +705,12 @@
                 mesh = new THREE.Mesh(geometry, material);
                 mesh.position.set(posX, 2, -50);
                 type = 'pillar';
+            }
+
+            // 履歴を更新
+            lastObstacleTypes.push(type);
+            if (lastObstacleTypes.length > 2) {
+                lastObstacleTypes.shift();
             }
 
             mesh.userData = { type: type, isObstacle: true };
