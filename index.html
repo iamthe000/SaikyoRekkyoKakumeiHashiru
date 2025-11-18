@@ -861,6 +861,8 @@
         // ▼▼▼ 追加: 自動一時停止/再開機能 ▼▼▼
         function setupVisibilityListeners() {
             document.addEventListener('visibilitychange', handleVisibilityChange);
+            window.addEventListener('pagehide', autoPause);
+            window.addEventListener('pageshow', autoResume);
         }
 
         function handleVisibilityChange() {
@@ -886,7 +888,12 @@
             }
         }
 
-        function autoResume() {
+        function autoResume(event) {
+            // pageshowイベント経由、かつBFキャッシュからの復元でない場合(つまり通常の初回読み込み)は何もしない
+            if (event && event.persisted === false) {
+                return;
+            }
+
             if (isPlaying && isAutoPaused) {
                 isPaused = false;
                 isAutoPaused = false; // フラグをリセット
