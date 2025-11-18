@@ -85,6 +85,17 @@
             text-shadow: 4px 4px 0 #fff; 
             text-align: center;
         }
+
+        /* ▼▼▼ 追加: タイトルロゴ画像用スタイル ▼▼▼ */
+        #title-logo {
+            max-width: 90%;      /* 画面からはみ出さないように */
+            height: auto;        /* 比率を維持 */
+            margin-bottom: 20px;
+            filter: drop-shadow(4px 4px 0 #fff); /* 元のテキストのような影をつける */
+            transform: rotate(-2deg); /* 元のテキストのような傾きをつける */
+        }
+        /* ▲▲▲ 追加 ▲▲▲ */
+
         p { color: white; text-align: center; max-width: 80%; }
         
         button {
@@ -168,7 +179,7 @@
     </div>
 
     <div id="start-screen">
-        <h1>最強列強<br>革命走る</h1>
+        <img src="title.png" id="title-logo" alt="最強列強革命走る">
         <p>スワイプ: 移動・ジャンプ・しゃがみ<br>「無敵」を集めろ！（無敵ではない）</p>
 
         <div style="color: white; margin-top: 15px; font-size: 18px;">
