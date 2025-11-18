@@ -320,6 +320,9 @@
         let clock, delta;
         let isPlaying = false;
         let isPaused = false; 
+        // ▼▼▼ 追加 (自動一時停止の状態を保持するフラグ) ▼▼▼
+        let isAutoPaused = false;
+        // ▲▲▲ 追加 ▼▼▼
         let score = 0;
         let speed = 15;
         let distance = 0; // 走行距離
@@ -432,11 +435,14 @@
             // ▼▼▼ 追加/変更 ▼▼▼
             setupCustomSkinUploader();
             customSkinGifElement = document.getElementById('custom-skin-gif-source');
-            // ▲▲▲ 追加/変更 ▲▲▲
+            // ▲▲▲ 追加/変更 ▼▼▼
 
             // イベントリスナー
             window.addEventListener('resize', onWindowResize);
             setupInputs(); 
+            // ▼▼▼ 追加: visibilitychangeリスナー ▼▼▼
+            setupVisibilityListeners();
+            // ▲▲▲ 追加: visibilitychangeリスナー ▼▼▼
 
             // BGMセットアップ
             bgmElement = document.getElementById('bgm-player');
@@ -582,7 +588,7 @@
                 // GIFが設定されている場合、毎フレームテクスチャを更新
                 player.material.map.needsUpdate = true;
             }
-            // ▲▲▲ 追加 ▲▲▲
+            // ▲▲▲ 追加 ▼▼▼
 
             renderer.render(scene, camera);
         }
@@ -715,6 +721,7 @@
             }
 
             mesh.userData = { type: type, isObstacle: true };
+            mesh.castShadow = true;
             scene.add(mesh);
             obstacles.push(mesh);
         }
@@ -832,6 +839,10 @@
 
         function togglePause() {
             if (!isPlaying) return; 
+            
+            // ▼▼▼ 変更: 自動一時停止中は手動再開を許可しない ▼▼▼
+            if (isAutoPaused) return;
+            // ▲▲▲ 変更 ▼▼▼
 
             isPaused = !isPaused;
             const pauseScreen = document.getElementById('pause-screen');
@@ -846,6 +857,46 @@
                 playBGM(); 
             }
         }
+        
+        // ▼▼▼ 追加: 自動一時停止/再開機能 ▼▼▼
+        function setupVisibilityListeners() {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        function handleVisibilityChange() {
+            if (document.hidden) {
+                // ページが非表示になった
+                autoPause();
+            } else {
+                // ページが再び表示された
+                autoResume();
+            }
+        }
+
+        function autoPause() {
+            if (isPlaying && !isPaused) {
+                isPaused = true;
+                isAutoPaused = true; // 自動一時停止フラグをセット
+                document.getElementById('pause-screen').classList.remove('hidden');
+                document.getElementById('pause-screen').querySelector('h1').innerText = "自動一時停止"; // ユーザーに通知
+                document.getElementById('pause-button').classList.add('hidden'); // 手動ボタンを隠す
+                if (bgmElement) {
+                    bgmElement.pause(); 
+                }
+            }
+        }
+
+        function autoResume() {
+            if (isPlaying && isAutoPaused) {
+                isPaused = false;
+                isAutoPaused = false; // フラグをリセット
+                document.getElementById('pause-screen').classList.add('hidden');
+                document.getElementById('pause-screen').querySelector('h1').innerText = "一時停止"; // 元に戻す
+                document.getElementById('pause-button').classList.remove('hidden'); // 手動ボタンを再表示
+                playBGM(); 
+            }
+        }
+        // ▲▲▲ 追加 ▼▼▼
 
         function returnToStart() {
             document.getElementById('pause-screen').classList.add('hidden');
@@ -853,6 +904,7 @@
             
             isPlaying = false;
             isPaused = false;
+            isAutoPaused = false; // ▼▼▼ 追加 ▼▼▼
             
             if (bgmElement) {
                 bgmElement.pause();
@@ -877,6 +929,7 @@
             isPlaying = true;
             playBGM(); 
             document.getElementById('pause-button').classList.remove('hidden'); 
+            isAutoPaused = false; // 念のためリセット
         }
 
         function gameOver() {
@@ -898,6 +951,7 @@
             document.getElementById('final-score').innerText = score;
             document.getElementById('final-distance').innerText = finalDist;
             updateSkinSelectorUI();
+            isAutoPaused = false; // 念のためリセット
         }
 
         function resetGame(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
@@ -908,6 +962,7 @@
             isPlaying = true;
             playBGM(); 
             document.getElementById('pause-button').classList.remove('hidden'); 
+            isAutoPaused = false; // 念のためリセット
         }
 
         function resetGameVals(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
@@ -947,7 +1002,9 @@
         // ==========================================
 
         function playBGM() {
-            if (isBGMEnabled && bgmElement && !isPaused) {
+            // ▼▼▼ 変更: isAutoPaused のチェックも追加 ▼▼▼
+            if (isBGMEnabled && bgmElement && !isPaused && !isAutoPaused) {
+            // ▲▲▲ 変更 ▼▼▼
                 bgmElement.muted = false; 
                 const promise = bgmElement.play();
                 if (promise !== undefined) {
@@ -1551,7 +1608,7 @@
                 resetGame(true); // ゲームオーバー画面から覚醒スタート
             }
         }
-        // ▲▲▲ 追加 ▲▲▲
+        // ▲▲▲ 追加 ▼▼▼
 
         // スタート
         init();
