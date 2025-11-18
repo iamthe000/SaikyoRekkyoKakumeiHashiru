@@ -182,7 +182,14 @@
             最長距離: <span id="high-distance-start">0</span>m
         </p>
         
-        <button onclick="startGame()">革命開始</button>
+        <button onclick="startGame(false)">革命開始</button>
+
+        <button id="awakening-start-btn" onclick="startAwakeningGame()" class="hidden" style="background: linear-gradient(45deg, #ff0, #f80); color: #000; margin-top: 10px; font-size: 18px;">
+            覚醒スタート (5000mから)
+        </button>
+        <button id="awakening-unlock-btn" onclick="unlockAwakening()" class="hidden" style="background: linear-gradient(45deg, #f00, #a00); color: white; margin-top: 10px; font-size: 18px;">
+            覚醒スタート解放 (無敵 200個消費)
+        </button>
         <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ（スキン）</button>
         <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         <button onclick="openCustomSkinScreen()" style="background: #0f0; color: #000; margin-top: 10px; font-size: 16px;">オリジナル同志作成</button>
@@ -200,7 +207,14 @@
             最長距離: <span id="high-distance-over">0</span>m)
         </p>
 
-        <button onclick="resetGame()">再革命</button>
+        <button onclick="resetGame(false)">再革命</button>
+
+        <button id="awakening-start-btn-over" onclick="startAwakeningGame()" class="hidden" style="background: linear-gradient(45deg, #ff0, #f80); color: #000; margin-top: 10px; font-size: 18px;">
+            覚醒スタート (5000mから)
+        </button>
+        <button id="awakening-unlock-btn-over" onclick="unlockAwakening()" class="hidden" style="background: linear-gradient(45deg, #f00, #a00); color: white; margin-top: 10px; font-size: 18px;">
+            覚醒スタート解放 (無敵 200個消費)
+        </button>
         <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ</button>
         
         <div style="color: white; margin-top: 15px; font-size: 18px;">
@@ -299,6 +313,14 @@
         let distance = 0; // 走行距離
         let highScore = 0; 
         let highDistance = 0; 
+
+        // ▼▼▼ 追加 (覚醒スタート用) ▼▼▼
+        let isAwakeningUnlocked = false; 
+        const AWAKENING_UNLOCK_COST = 200;
+        const AWAKENING_START_DISTANCE = 5000;
+        const AWAKENING_START_SPEED = 47; // 5000m到達時の想定スピード (計算値)
+        const AWAKENING_START_SCORE = 5000; // 距離と合わせる
+        // ▲▲▲ 追加 ▲▲▲
 
         // --- データ管理 ---
         let mutekiBalls = 0;
@@ -410,7 +432,7 @@
             bgmElement.muted = true; 
 
             // ★ロード処理
-            loadData(); // この中でスキンセレクターUIとハイスコアUIが更新される
+            loadData(); // この中でスキンセレクターUIとハイスコアUIと覚醒UIが更新される
 
             // ループ開始
             clock = new THREE.Clock();
@@ -683,6 +705,7 @@
                 mutekiBalls++;
                 score += 1000;
                 updateMutekiCountUI();
+                updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
                 saveData(); 
                 scene.remove(obj);
                 obstacles.splice(index, 1);
@@ -820,12 +843,13 @@
             resetGameVals();
             updateSkinSelectorUI();
             updateHighScoreUI(); 
+            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
         }
 
 
-        function startGame() {
+        function startGame(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
             document.getElementById('start-screen').classList.add('hidden');
-            resetGameVals(); 
+            resetGameVals(isAwakening); // ▼▼▼ 変更 ▼▼▼
             isPlaying = true;
             playBGM(); 
             document.getElementById('pause-button').classList.remove('hidden'); 
@@ -844,6 +868,7 @@
             }
             saveData(); 
             updateHighScoreUI();
+            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
             
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
@@ -851,9 +876,9 @@
             updateSkinSelectorUI();
         }
 
-        function resetGame() {
+        function resetGame(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
             document.getElementById('game-over-screen').classList.add('hidden');
-            resetGameVals();
+            resetGameVals(isAwakening); // ▼▼▼ 変更 ▼▼▼
             obstacles.forEach(o => scene.remove(o));
             obstacles = [];
             isPlaying = true;
@@ -861,10 +886,17 @@
             document.getElementById('pause-button').classList.remove('hidden'); 
         }
 
-        function resetGameVals() {
-            score = 0;
-            speed = 15;
-            distance = 0; 
+        function resetGameVals(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
+            if (isAwakening) {
+                score = AWAKENING_START_SCORE;
+                speed = AWAKENING_START_SPEED;
+                distance = AWAKENING_START_DISTANCE;
+            } else {
+                score = 0;
+                speed = 15;
+                distance = 0; 
+            }
+            
             currentLane = 0;
             targetX = 0;
             player.position.x = 0;
@@ -875,8 +907,8 @@
             jumpVelocity = 0;
             crouchTimer = 0;
             
-            document.getElementById('score-val').innerText = '0';
-            document.getElementById('distance-val').innerText = '0';
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('distance-val').innerText = Math.floor(distance);
             updateMutekiCountUI();
         }
 
@@ -1022,6 +1054,8 @@
 
             const gachaButton = document.getElementById('gacha-button');
             gachaButton.disabled = (mutekiBalls < GACHA_COST);
+            
+            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
         }
 
         function closeGacha() {
@@ -1040,6 +1074,7 @@
             mutekiBalls -= GACHA_COST;
             updateMutekiCountUI(); 
             document.getElementById('gacha-muteki-count').innerText = mutekiBalls; 
+            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
             
             const pickaxe = document.getElementById('pickaxe');
             const imgContainer = document.getElementById('torotuki-container');
@@ -1294,7 +1329,8 @@
                     balls: mutekiBalls,
                     skin: currentSkin,
                     highScore: highScore, 
-                    highDistance: highDistance 
+                    highDistance: highDistance,
+                    isAwakeningUnlocked: isAwakeningUnlocked // ▼▼▼ 追加 ▼▼▼
                 };
                 // ★注意: ここにはカスタムスキンの画像データ(dataURL)は含まれない
                 localStorage.setItem(SAVE_DATA_KEY, JSON.stringify(data));
@@ -1316,6 +1352,7 @@
                     currentSkin = data.skin || 'player.png';
                     highScore = data.highScore || 0; 
                     highDistance = data.highDistance || 0; 
+                    isAwakeningUnlocked = data.isAwakeningUnlocked || false; // ▼▼▼ 追加 ▼▼▼
                     
                     console.log("メインデータをロードしました。", data);
                     
@@ -1366,6 +1403,7 @@
             // 4. UIを更新
             updateSkinSelectorUI();
             updateHighScoreUI(); 
+            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
         }
 
         // --- 引き継ぎ画面UI ---
@@ -1403,6 +1441,7 @@
                 const jsonData = atob(base64Code);
                 const data = JSON.parse(jsonData); 
                 
+                // ▼▼▼ 変更 (isAwakeningUnlockedのチェックは任意項目として扱う) ▼▼▼
                 if (data && typeof data.skins !== 'undefined' && typeof data.balls !== 'undefined') {
                     // メインデータのみを保存
                     localStorage.setItem(SAVE_DATA_KEY, jsonData);
@@ -1419,6 +1458,76 @@
                 alert("無効なコードです。データ復元に失敗しました。");
             }
         }
+
+        // ==========================================
+        // ▼▼▼ 追加 (覚醒スタート用) ▼▼▼
+        // ==========================================
+
+        function updateAwakeningUI() {
+            const unlockBtn = document.getElementById('awakening-unlock-btn');
+            const startBtn = document.getElementById('awakening-start-btn');
+            const unlockBtnOver = document.getElementById('awakening-unlock-btn-over');
+            const startBtnOver = document.getElementById('awakening-start-btn-over');
+
+            if (isAwakeningUnlocked) {
+                // 解放済み
+                unlockBtn.classList.add('hidden');
+                startBtn.classList.remove('hidden');
+                unlockBtnOver.classList.add('hidden');
+                startBtnOver.classList.remove('hidden');
+            } else {
+                // 未解放
+                unlockBtn.classList.remove('hidden');
+                startBtn.classList.add('hidden');
+                unlockBtnOver.classList.remove('hidden');
+                startBtnOver.classList.add('hidden');
+
+                // コストが足りているか
+                if (mutekiBalls >= AWAKENING_UNLOCK_COST) {
+                    unlockBtn.disabled = false;
+                    unlockBtnOver.disabled = false;
+                    unlockBtn.innerText = `覚醒スタート解放 (無敵 ${AWAKENING_UNLOCK_COST}個消費)`;
+                    unlockBtnOver.innerText = `覚醒スタート解放 (無敵 ${AWAKENING_UNLOCK_COST}個消費)`;
+                } else {
+                    unlockBtn.disabled = true;
+                    unlockBtnOver.disabled = true;
+                    unlockBtn.innerText = `解放 (無敵 ${AWAKENING_UNLOCK_COST}個必要)`;
+                    unlockBtnOver.innerText = `解放 (無敵 ${AWAKENING_UNLOCK_COST}個必要)`;
+                }
+            }
+        }
+
+        function unlockAwakening() {
+            if (isAwakeningUnlocked) return; 
+            
+            if (mutekiBalls >= AWAKENING_UNLOCK_COST) {
+                mutekiBalls -= AWAKENING_UNLOCK_COST;
+                isAwakeningUnlocked = true;
+                
+                updateMutekiCountUI();
+                updateAwakeningUI();
+                saveData(); // 保存
+                
+                alert(`覚醒スタートを解放しました！\n(無敵ボール ${AWAKENING_UNLOCK_COST}個消費)`);
+            } else {
+                alert(`無敵ボールが ${AWAKENING_UNLOCK_COST}個 必要です。`);
+            }
+        }
+
+        function startAwakeningGame() {
+            if (!isAwakeningUnlocked) {
+                alert("覚醒スタートは解放されていません。");
+                return;
+            }
+
+            // スタート画面かゲームオーバー画面かを判定して閉じる
+            if (!document.getElementById('start-screen').classList.contains('hidden')) {
+                startGame(true); // スタート画面から覚醒スタート
+            } else if (!document.getElementById('game-over-screen').classList.contains('hidden')) {
+                resetGame(true); // ゲームオーバー画面から覚醒スタート
+            }
+        }
+        // ▲▲▲ 追加 ▲▲▲
 
         // スタート
         init();
