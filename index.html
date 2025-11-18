@@ -662,7 +662,7 @@
             let mesh;
             let type = '';
 
-            if (typeRand < 0.5) {
+            if (typeRand < 0.2) {
                 const geometry = new THREE.SphereGeometry(0.5, 16, 16);
                 const material = new THREE.MeshBasicMaterial({ map: createMutekiTexture() });
                 mesh = new THREE.Mesh(geometry, material);
