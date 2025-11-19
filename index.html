@@ -1121,7 +1121,7 @@
                 img.src = TOROTUKI_IMG_SRC;
                 gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
                 // ▼ 修正: レア同志が出ないことを明記
-                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br>一般同志（未所持なら確定）`;
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br>一般同志`;
                 gachaButton.onclick = runNormalGacha;
             } else if (type === 'rare') {
                 cost = RARE_GACHA_COST;
