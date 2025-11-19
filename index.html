@@ -352,8 +352,8 @@
         let mutekiBalls = 0;
         let currentSkin = 'player.png';
         let ownedSkins = new Set(['player.png']); // デフォルトスキン
-        const NORMAL_GACHA_COST = 10; // ▼ 変更: トロツキーワクワクガチャのコスト
-        const RARE_GACHA_COST = 20; // ▼ 追加: 資本主義の奴隷ガチャのコスト
+        const NORMAL_GACHA_COST = 20; // ▼ 変更: トロツキーワクワクガチャのコスト
+        const RARE_GACHA_COST = 50; // ▼ 追加: 資本主義の奴隷ガチャのコスト
         let currentGachaType = 'normal'; // ▼ 追加: 現在開いているガチャの種類 ('normal' or 'rare')
 
         const SKIN_LIST = [
@@ -1232,7 +1232,7 @@
             }, 100);
         }
         
-        // ▼ 追加: レアガチャの実行ロジック (レアスキン確率以外は虚無)
+        // ▼ 追加: レアガチャの実行ロジック
         function runRareGacha() {
             const cost = RARE_GACHA_COST;
             if (mutekiBalls < cost) {
@@ -1269,10 +1269,12 @@
                         let hit = false;
                         const rand = Math.random();
                         let cumulativeRate = 0.0;
-                        const rareSkinsExcludingTrotsky = RARE_SKINS.filter(s => s.name !== TOROTUKI_IMG_SRC); // トロツキー以外
+                        
+                        // ★修正★: トロツキー(torotuki)を除外するフィルタを削除し、排出可能にしました。
+                        // const rareSkinsExcludingTrotsky = RARE_SKINS.filter(s => s.name !== TOROTUKI_IMG_SRC); 
 
                         // レアスキン判定
-                        for (const rare of rareSkinsExcludingTrotsky) {
+                        for (const rare of RARE_SKINS) { // 全てのレアスキンから判定
                             cumulativeRate += rare.rate;
                             if (rand < cumulativeRate) {
                                 newSkin = rare.name;
@@ -1293,7 +1295,6 @@
                             resultText = `<span style="color: #aaa;">虚無... 資本主義の奴隷からは何も得られませんでした...</span>`;
                         }
                         
-                        // ★★★ 修正箇所: innerText -> innerHTML ★★★
                         document.getElementById('gacha-result').innerHTML = resultText;
                         saveData();
 
@@ -1379,10 +1380,8 @@
             if (rareInfo) {
                 let percent = (rareInfo.rate * 100).toFixed(3).replace(/\.?0+$/, ""); // 小数点以下を整形
                 
-                // レアリティ表示をガチャに応じて変更
-                let gachaTypeLabel = rareInfo.name === TOROTUKI_IMG_SRC ? "ノーマル" : "レア";
-
-                probabilityText = ` (${rareInfo.rarity}, ${gachaTypeLabel}ガチャ ${percent}%)`;
+                // ★修正★: 常に「レアガチャ」と表示するように条件分岐を削除
+                probabilityText = ` (${rareInfo.rarity}, レアガチャ ${percent}%)`;
             
             } else if (skinName === CUSTOM_SKIN_ID) {
                 probabilityText = isCustomSkinAnimated ? " (カスタム, GIF)" : " (カスタム)";
