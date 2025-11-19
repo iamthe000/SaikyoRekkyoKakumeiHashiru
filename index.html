@@ -1120,7 +1120,8 @@
                 gachaTitle.innerText = "トロツキーワクワクガチャ";
                 img.src = TOROTUKI_IMG_SRC;
                 gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
-                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br>一般同志（未所持なら確定）/ レア同志`;
+                // ▼ 修正: レア同志が出ないことを明記
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br>一般同志（未所持なら確定）`;
                 gachaButton.onclick = runNormalGacha;
             } else if (type === 'rare') {
                 cost = RARE_GACHA_COST;
@@ -1163,7 +1164,7 @@
             }
         }
 
-        // ▼ 追加: ノーマルガチャの実行ロジック (旧runGachaのロジックを継承)
+        // ▼ 追加: ノーマルガチャの実行ロジック (レア排出ロジックを削除)
         function runNormalGacha() {
             const cost = NORMAL_GACHA_COST;
             if (mutekiBalls < cost) {
@@ -1197,43 +1198,25 @@
                         
                         let newSkin = "";
                         let resultText = "";
-                        let hit = false;
-                        const rand = Math.random();
-                        let cumulativeRate = 0.0;
-                        const normalRareSkins = RARE_SKINS.filter(s => s.name === TOROTUKI_IMG_SRC); // トロツキーのみ
+                        
+                        // レアスキン（トロツキー）判定ロジックを完全に削除しました。
+                        // 常にノーマルスキンのみを抽選します。
 
-                        // 1. レアスキン（トロツキー）判定
-                        for (const rare of normalRareSkins) {
-                            cumulativeRate += rare.rate;
-                            if (rand < cumulativeRate) {
-                                newSkin = rare.name;
-                                if (ownedSkins.has(newSkin)) {
-                                    resultText = `★${rare.rarity}!!★ [${newSkin}] は既に所持しています`;
-                                } else {
-                                    ownedSkins.add(newSkin);
-                                    updateSkinSelectorUI(); 
-                                    resultText = `★★★${rare.rarity}同志 [${newSkin}] を召喚!!!★★★`;
-                                }
-                                hit = true;
-                                break; 
-                            }
-                        }
-
-                        // 2. ノーマルスキン判定 (レアスキンにヒットしなかった場合)
-                        if (!hit) {
-                            const availableNormalSkins = SKIN_LIST.filter(s => !ownedSkins.has(s) && s !== CUSTOM_SKIN_ID && s !== TOROTUKI_IMG_SRC);
-                            
-                            if (availableNormalSkins.length > 0) {
-                                // 未所持のノーマルスキンがあれば確定排出
-                                newSkin = availableNormalSkins[Math.floor(Math.random() * availableNormalSkins.length)];
-                                ownedSkins.add(newSkin);
-                                updateSkinSelectorUI(); 
-                                resultText = `新規同志 [${newSkin}] を召喚！`;
-                            } else {
-                                // 全て所持していれば、ランダムで再排出
-                                newSkin = SKIN_LIST.filter(s => s !== CUSTOM_SKIN_ID).find(s => s === 'player.png' || true); // 少なくともplayer.pngは持っている
-                                resultText = `同志 [${newSkin}] は既に所持しています`;
-                            }
+                        // 未所持のノーマルスキンを探す
+                        const availableNormalSkins = SKIN_LIST.filter(s => !ownedSkins.has(s) && s !== CUSTOM_SKIN_ID && s !== TOROTUKI_IMG_SRC);
+                        
+                        if (availableNormalSkins.length > 0) {
+                            // 未所持のノーマルスキンがあれば確定排出
+                            newSkin = availableNormalSkins[Math.floor(Math.random() * availableNormalSkins.length)];
+                            ownedSkins.add(newSkin);
+                            updateSkinSelectorUI(); 
+                            resultText = `新規同志 [${newSkin}] を召喚！`;
+                        } else {
+                            // 全て所持していれば、ランダムで再排出
+                            // カスタムスキンとレア判定画像を除外したリストから選ぶ
+                            const allNormalSkins = SKIN_LIST.filter(s => s !== CUSTOM_SKIN_ID && s !== TOROTUKI_IMG_SRC);
+                            newSkin = allNormalSkins[Math.floor(Math.random() * allNormalSkins.length)];
+                            resultText = `同志 [${newSkin}] は既に所持しています`;
                         }
                         
                         document.getElementById('gacha-result').innerText = resultText;
