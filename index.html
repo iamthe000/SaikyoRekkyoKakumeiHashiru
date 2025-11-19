@@ -63,7 +63,7 @@
         }
         
         /* オーバーレイ共通 */
-        #start-screen, #game-over-screen, #gacha-screen, #save-load-screen, #pause-screen, #skin-list-screen, #custom-skin-screen {
+        #start-screen, #game-over-screen, #gacha-selection-screen, #gacha-screen, #save-load-screen, #pause-screen, #skin-list-screen, #custom-skin-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.8);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -202,7 +202,7 @@
         <button id="awakening-unlock-btn" onclick="unlockAwakening()" class="hidden" style="background: linear-gradient(45deg, #f00, #a00); color: white; margin-top: 10px; font-size: 18px;">
             覚醒スタート解放 (無敵 200個消費)
         </button>
-        <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ（スキン）</button>
+        <button onclick="openGachaSelection()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ（スキン）</button>
         <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         <button onclick="openCustomSkinScreen()" style="background: #0f0; color: #000; margin-top: 10px; font-size: 16px;">オリジナル同志作成</button>
         <button id="bgm-toggle-start" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
@@ -227,8 +227,7 @@
         <button id="awakening-unlock-btn-over" onclick="unlockAwakening()" class="hidden" style="background: linear-gradient(45deg, #f00, #a00); color: white; margin-top: 10px; font-size: 18px;">
             覚醒スタート解放 (無敵 200個消費)
         </button>
-        <button onclick="openGacha()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ</button>
-        
+        <button onclick="openGachaSelection()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ</button>
         <div style="color: white; margin-top: 15px; font-size: 18px;">
             <label>現在の同志 (スキン): </label>
             <select class="skin-selector" onchange="changeSkin(this.value)" style="font-size: 16px; padding: 5px; background: #333; color: white; border: 2px solid #f0f;">
@@ -240,19 +239,34 @@
         <button id="bgm-toggle-over" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
         </div>
 
-    <div id="gacha-screen" class="hidden">
+    <div id="gacha-selection-screen" class="hidden">
         <h1 style="color: #ffaa00;">同志召喚</h1>
+        <p>どのガチャを引きますか？</p>
+
+        <button onclick="openGacha('rare')" style="background: linear-gradient(45deg, #f0f, #a0f); color: white; margin-top: 20px; font-size: 20px;">
+            資本主義の奴隷ガチャ (レア)
+        </button>
+        <button onclick="openGacha('normal')" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 20px;">
+            トロツキーワクワクガチャ (ノーマル)
+        </button>
+        <button onclick="" style="background: #444; color: white; margin-top: 10px; font-size: 16px;" disabled>
+            期間限定ガチャ (開発中)
+        </button>
+        <button onclick="closeGachaSelection()" style="background: #555; font-size: 16px; margin-top: 30px;">戻る</button>
+    </div>
+    <div id="gacha-screen" class="hidden">
+        <h1 id="gacha-title" style="color: #ffaa00;">同志召喚</h1>
         <div id="torotuki-container">
-            <img id="torotuki-img" src="" alt="Trotsky Target">
+            <img id="torotuki-img" src="" alt="Target">
             <div id="pickaxe">⛏️</div>
         </div>
         <div id="gacha-info">
-            <p>1回: 無敵ボール 20個</p>
+            <p id="gacha-cost-text"></p>
             <p>所持: <span id="gacha-muteki-count">0</span>個</p>
         </div>
         <div id="gacha-result" style="font-size: 20px; color: yellow; height: 30px;"></div>
-        <button id="gacha-button" onclick="runGacha()">ピッケル投擲 (20個消費)</button>
-        <button onclick="closeGacha()" style="background: #555; font-size: 16px; margin-top: 10px;">戻る</button>
+        <button id="gacha-button" onclick="runGachaHandler()"></button>
+        <button onclick="closeGacha()" style="background: #555; font-size: 16px; margin-top: 10px;">ガチャ選択に戻る</button>
     </div>
 
     <div id="save-load-screen" class="hidden">
@@ -320,9 +334,6 @@
         let clock, delta;
         let isPlaying = false;
         let isPaused = false; 
-        // ▼▼▼ 追加 (自動一時停止の状態を保持するフラグ) ▼▼▼
-        let isAutoPaused = false;
-        // ▲▲▲ 追加 ▼▼▼
         let score = 0;
         let speed = 15;
         let distance = 0; // 走行距離
@@ -341,9 +352,12 @@
         let mutekiBalls = 0;
         let currentSkin = 'player.png';
         let ownedSkins = new Set(['player.png']); // デフォルトスキン
-        const GACHA_COST = 20;
+        const NORMAL_GACHA_COST = 20; // ▼ 変更: トロツキーワクワクガチャのコスト
+        const RARE_GACHA_COST = 100; // ▼ 追加: 資本主義の奴隷ガチャのコスト
+        let currentGachaType = 'normal'; // ▼ 追加: 現在開いているガチャの種類 ('normal' or 'rare')
+
         const SKIN_LIST = [
-            'player.png', 'player2.jpg', 'player3.jpg', 'player4.jpg', 'player5.jpg', 'player6.jpg', 'player7.jpg', 'player8.jpg', 'player9.jpg', 'player10.jpg', 'player11.jpg', 'player12.jpg', 'player13.jpg', 'player14.jpg', 'player15.jpg', 'player16.jpg', 'player17.jpg',"player18.png"
+            'player.png', 'player2.jpg', 'player3.jpg', 'player4.jpg', 'player5.jpg', 'player6.jpg', 'player7.jpg', 'player8.jpg', 'player9.jpg', 'player10.jpg', 'player11.jpg', 'player12.jpg', 'player13.jpg', 'player14.jpg', 'player15.jpg', 'player16.jpg', 'player17.jpg'
         ];
         const SAVE_DATA_KEY = 'revolutionRunData';
 
@@ -374,6 +388,7 @@
         
         // 画像パス (ガチャのターゲット画像)
         const TOROTUKI_IMG_SRC = 'torotuki.jpg';
+        const BERLIN_WALL_IMG_SRC = 'BerlinWall.jpg'; // ▼ 追加: レアガチャ用ターゲット画像
 
         // BGM用
         let bgmElement;
@@ -429,20 +444,18 @@
             // プレイヤー生成
             createPlayer();
 
-            // ガチャ用画像のセットアップ
-            setupGachaImages();
+            // ▼ 変更: 初期化時の画像セットアップを削除し、openGachaSelectionへ移譲
+            // setupGachaImages(); 
+            // ▲ 変更
 
             // ▼▼▼ 追加/変更 ▼▼▼
             setupCustomSkinUploader();
             customSkinGifElement = document.getElementById('custom-skin-gif-source');
-            // ▲▲▲ 追加/変更 ▼▼▼
+            // ▲▲▲ 追加/変更 ▲▲▲
 
             // イベントリスナー
             window.addEventListener('resize', onWindowResize);
             setupInputs(); 
-            // ▼▼▼ 追加: visibilitychangeリスナー ▼▼▼
-            setupVisibilityListeners();
-            // ▲▲▲ 追加: visibilitychangeリスナー ▼▼▼
 
             // BGMセットアップ
             bgmElement = document.getElementById('bgm-player');
@@ -588,7 +601,7 @@
                 // GIFが設定されている場合、毎フレームテクスチャを更新
                 player.material.map.needsUpdate = true;
             }
-            // ▲▲▲ 追加 ▼▼▼
+            // ▲▲▲ 追加 ▲▲▲
 
             renderer.render(scene, camera);
         }
@@ -721,7 +734,6 @@
             }
 
             mesh.userData = { type: type, isObstacle: true };
-            mesh.castShadow = true;
             scene.add(mesh);
             obstacles.push(mesh);
         }
@@ -736,7 +748,7 @@
                 mutekiBalls++;
                 score += 1000;
                 updateMutekiCountUI();
-                updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
+                updateAwakeningUI(); 
                 saveData(); 
                 scene.remove(obj);
                 obstacles.splice(index, 1);
@@ -839,10 +851,6 @@
 
         function togglePause() {
             if (!isPlaying) return; 
-            
-            // ▼▼▼ 変更: 自動一時停止中は手動再開を許可しない ▼▼▼
-            if (isAutoPaused) return;
-            // ▲▲▲ 変更 ▼▼▼
 
             isPaused = !isPaused;
             const pauseScreen = document.getElementById('pause-screen');
@@ -857,53 +865,6 @@
                 playBGM(); 
             }
         }
-        
-        // ▼▼▼ 追加: 自動一時停止/再開機能 ▼▼▼
-        function setupVisibilityListeners() {
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('pagehide', autoPause);
-            window.addEventListener('pageshow', autoResume);
-        }
-
-        function handleVisibilityChange() {
-            if (document.hidden) {
-                // ページが非表示になった
-                autoPause();
-            } else {
-                // ページが再び表示された
-                autoResume();
-            }
-        }
-
-        function autoPause() {
-            if (isPlaying && !isPaused) {
-                isPaused = true;
-                isAutoPaused = true; // 自動一時停止フラグをセット
-                document.getElementById('pause-screen').classList.remove('hidden');
-                document.getElementById('pause-screen').querySelector('h1').innerText = "自動一時停止"; // ユーザーに通知
-                document.getElementById('pause-button').classList.add('hidden'); // 手動ボタンを隠す
-                if (bgmElement) {
-                    bgmElement.pause(); 
-                }
-            }
-        }
-
-        function autoResume(event) {
-            // pageshowイベント経由、かつBFキャッシュからの復元でない場合(つまり通常の初回読み込み)は何もしない
-            if (event && event.persisted === false) {
-                return;
-            }
-
-            if (isPlaying && isAutoPaused) {
-                isPaused = false;
-                isAutoPaused = false; // フラグをリセット
-                document.getElementById('pause-screen').classList.add('hidden');
-                document.getElementById('pause-screen').querySelector('h1').innerText = "一時停止"; // 元に戻す
-                document.getElementById('pause-button').classList.remove('hidden'); // 手動ボタンを再表示
-                playBGM(); 
-            }
-        }
-        // ▲▲▲ 追加 ▼▼▼
 
         function returnToStart() {
             document.getElementById('pause-screen').classList.add('hidden');
@@ -911,7 +872,6 @@
             
             isPlaying = false;
             isPaused = false;
-            isAutoPaused = false; // ▼▼▼ 追加 ▼▼▼
             
             if (bgmElement) {
                 bgmElement.pause();
@@ -926,17 +886,16 @@
             resetGameVals();
             updateSkinSelectorUI();
             updateHighScoreUI(); 
-            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
+            updateAwakeningUI(); 
         }
 
 
-        function startGame(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
+        function startGame(isAwakening = false) { 
             document.getElementById('start-screen').classList.add('hidden');
-            resetGameVals(isAwakening); // ▼▼▼ 変更 ▼▼▼
+            resetGameVals(isAwakening); 
             isPlaying = true;
             playBGM(); 
             document.getElementById('pause-button').classList.remove('hidden'); 
-            isAutoPaused = false; // 念のためリセット
         }
 
         function gameOver() {
@@ -952,27 +911,25 @@
             }
             saveData(); 
             updateHighScoreUI();
-            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
+            updateAwakeningUI(); 
             
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('final-score').innerText = score;
             document.getElementById('final-distance').innerText = finalDist;
             updateSkinSelectorUI();
-            isAutoPaused = false; // 念のためリセット
         }
 
-        function resetGame(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
+        function resetGame(isAwakening = false) { 
             document.getElementById('game-over-screen').classList.add('hidden');
-            resetGameVals(isAwakening); // ▼▼▼ 変更 ▼▼▼
+            resetGameVals(isAwakening); 
             obstacles.forEach(o => scene.remove(o));
             obstacles = [];
             isPlaying = true;
             playBGM(); 
             document.getElementById('pause-button').classList.remove('hidden'); 
-            isAutoPaused = false; // 念のためリセット
         }
 
-        function resetGameVals(isAwakening = false) { // ▼▼▼ 変更 ▼▼▼
+        function resetGameVals(isAwakening = false) { 
             if (isAwakening) {
                 score = AWAKENING_START_SCORE;
                 speed = AWAKENING_START_SPEED;
@@ -1009,9 +966,7 @@
         // ==========================================
 
         function playBGM() {
-            // ▼▼▼ 変更: isAutoPaused のチェックも追加 ▼▼▼
-            if (isBGMEnabled && bgmElement && !isPaused && !isAutoPaused) {
-            // ▲▲▲ 変更 ▼▼▼
+            if (isBGMEnabled && bgmElement && !isPaused) {
                 bgmElement.muted = false; 
                 const promise = bgmElement.play();
                 if (promise !== undefined) {
@@ -1115,10 +1070,71 @@
         }
 
         // ==========================================
-        // ガチャシステム
+        // ガチャシステム (大改修)
         // ==========================================
-        function setupGachaImages() {
+
+        // ▼ 追加: ガチャ選択画面の表示
+        function openGachaSelection() {
+            document.getElementById('gacha-selection-screen').classList.remove('hidden');
+            document.getElementById('gacha-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+        }
+
+        // ▼ 追加: ガチャ選択画面を閉じる
+        function closeGachaSelection() {
+            document.getElementById('gacha-selection-screen').classList.add('hidden');
+            if (isPlaying || isPaused) {
+                document.getElementById('pause-screen').classList.remove('hidden');
+            } else {
+                document.getElementById('start-screen').classList.remove('hidden');
+            }
+        }
+
+        // ▼ 変更: 選択されたガチャ画面の表示
+        function openGacha(type) {
+            currentGachaType = type;
+            document.getElementById('gacha-selection-screen').classList.add('hidden');
+            document.getElementById('gacha-screen').classList.remove('hidden');
+            
+            document.getElementById('gacha-result').innerText = "";
+            document.getElementById('gacha-muteki-count').innerText = mutekiBalls;
+            
+            updateGachaScreen(type);
+        }
+
+        // ▼ 追加: ガチャ画面のUIを更新
+        function updateGachaScreen(type) {
             const img = document.getElementById('torotuki-img');
+            const gachaButton = document.getElementById('gacha-button');
+            const pickaxe = document.getElementById('pickaxe');
+            const gachaTitle = document.getElementById('gacha-title');
+            const gachaCostText = document.getElementById('gacha-cost-text');
+            let cost = 0;
+
+            pickaxe.style.opacity = '0';
+            pickaxe.style.transform = 'translate(0, 0) rotate(0deg)';
+
+            if (type === 'normal') {
+                cost = NORMAL_GACHA_COST;
+                gachaTitle.innerText = "トロツキーワクワクガチャ";
+                img.src = TOROTUKI_IMG_SRC;
+                gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br>一般同志（未所持なら確定）/ レア同志`;
+                gachaButton.onclick = runNormalGacha;
+            } else if (type === 'rare') {
+                cost = RARE_GACHA_COST;
+                gachaTitle.innerText = "資本主義の奴隷ガチャ";
+                img.src = BERLIN_WALL_IMG_SRC; // 新しいターゲット画像
+                gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br><span style="color: #f00;">レア同志以外は虚無（何も得られない）</span>`;
+                gachaButton.onclick = runRareGacha;
+            } else {
+                // ここには来ない想定
+                return;
+            }
+
+            // 画像エラーハンドリング (再設定)
             img.onerror = function() {
                 const c = document.createElement('canvas');
                 c.width = 200; c.height = 200;
@@ -1128,30 +1144,29 @@
                 x.fillText('Target', 100, 100);
                 img.src = c.toDataURL();
             };
-            img.src = TOROTUKI_IMG_SRC;
+
+            gachaButton.disabled = (mutekiBalls < cost);
         }
 
-        function openGacha() {
-            document.getElementById('gacha-screen').classList.remove('hidden');
-            document.getElementById('gacha-result').innerText = "";
-            document.getElementById('gacha-muteki-count').innerText = mutekiBalls;
-            
-            const pickaxe = document.getElementById('pickaxe');
-            pickaxe.style.opacity = '0';
-            pickaxe.style.transform = 'translate(0, 0) rotate(0deg)';
-
-            const gachaButton = document.getElementById('gacha-button');
-            gachaButton.disabled = (mutekiBalls < GACHA_COST);
-            
-            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
-        }
-
+        // ▼ 変更: ガチャ画面から選択画面へ戻る
         function closeGacha() {
             document.getElementById('gacha-screen').classList.add('hidden');
+            openGachaSelection(); // ガチャ選択画面に戻る
         }
 
-        function runGacha() {
-            if (mutekiBalls < GACHA_COST) {
+        // ▼ 変更: runGachaを削除し、runGachaHandlerで分岐
+        function runGachaHandler() {
+            if (currentGachaType === 'normal') {
+                runNormalGacha();
+            } else if (currentGachaType === 'rare') {
+                runRareGacha();
+            }
+        }
+
+        // ▼ 追加: ノーマルガチャの実行ロジック (旧runGachaのロジックを継承)
+        function runNormalGacha() {
+            const cost = NORMAL_GACHA_COST;
+            if (mutekiBalls < cost) {
                 document.getElementById('gacha-result').innerText = "無敵ボールが足りません！";
                 return;
             }
@@ -1159,10 +1174,10 @@
             const gachaButton = document.getElementById('gacha-button');
             gachaButton.disabled = true;
 
-            mutekiBalls -= GACHA_COST;
+            mutekiBalls -= cost;
             updateMutekiCountUI(); 
             document.getElementById('gacha-muteki-count').innerText = mutekiBalls; 
-            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
+            updateAwakeningUI(); 
             
             const pickaxe = document.getElementById('pickaxe');
             const imgContainer = document.getElementById('torotuki-container');
@@ -1185,8 +1200,10 @@
                         let hit = false;
                         const rand = Math.random();
                         let cumulativeRate = 0.0;
+                        const normalRareSkins = RARE_SKINS.filter(s => s.name === TOROTUKI_IMG_SRC); // トロツキーのみ
 
-                        for (const rare of RARE_SKINS) {
+                        // 1. レアスキン（トロツキー）判定
+                        for (const rare of normalRareSkins) {
                             cumulativeRate += rare.rate;
                             if (rand < cumulativeRate) {
                                 newSkin = rare.name;
@@ -1202,21 +1219,27 @@
                             }
                         }
 
+                        // 2. ノーマルスキン判定 (レアスキンにヒットしなかった場合)
                         if (!hit) {
-                            newSkin = SKIN_LIST[Math.floor(Math.random() * SKIN_LIST.length)];
-                            if (ownedSkins.has(newSkin)) {
-                                resultText = `同志 [${newSkin}] は既に所持しています`;
-                            } else {
+                            const availableNormalSkins = SKIN_LIST.filter(s => !ownedSkins.has(s) && s !== CUSTOM_SKIN_ID && s !== TOROTUKI_IMG_SRC);
+                            
+                            if (availableNormalSkins.length > 0) {
+                                // 未所持のノーマルスキンがあれば確定排出
+                                newSkin = availableNormalSkins[Math.floor(Math.random() * availableNormalSkins.length)];
                                 ownedSkins.add(newSkin);
                                 updateSkinSelectorUI(); 
                                 resultText = `新規同志 [${newSkin}] を召喚！`;
+                            } else {
+                                // 全て所持していれば、ランダムで再排出
+                                newSkin = SKIN_LIST.filter(s => s !== CUSTOM_SKIN_ID).find(s => s === 'player.png' || true); // 少なくともplayer.pngは持っている
+                                resultText = `同志 [${newSkin}] は既に所持しています`;
                             }
                         }
                         
                         document.getElementById('gacha-result').innerText = resultText;
                         saveData();
 
-                        if (mutekiBalls >= GACHA_COST) {
+                        if (mutekiBalls >= cost) {
                             gachaButton.disabled = false;
                         }
 
@@ -1224,6 +1247,80 @@
                 }, 300);
             }, 100);
         }
+        
+        // ▼ 追加: レアガチャの実行ロジック (レアスキン確率以外は虚無)
+        function runRareGacha() {
+            const cost = RARE_GACHA_COST;
+            if (mutekiBalls < cost) {
+                document.getElementById('gacha-result').innerText = "無敵ボールが足りません！";
+                return;
+            }
+
+            const gachaButton = document.getElementById('gacha-button');
+            gachaButton.disabled = true;
+
+            mutekiBalls -= cost;
+            updateMutekiCountUI(); 
+            document.getElementById('gacha-muteki-count').innerText = mutekiBalls; 
+            updateAwakeningUI();
+            
+            const pickaxe = document.getElementById('pickaxe');
+            const imgContainer = document.getElementById('torotuki-container');
+            
+            pickaxe.style.opacity = '1';
+            pickaxe.style.top = '-50px';
+            pickaxe.style.right = '-50px';
+            
+            setTimeout(() => {
+                pickaxe.style.transform = 'translate(-80px, 80px) rotate(-45deg)'; 
+                
+                setTimeout(() => {
+                    imgContainer.classList.add('shake');
+                    
+                    setTimeout(() => {
+                        imgContainer.classList.remove('shake');
+                        
+                        let newSkin = "";
+                        let resultText = "";
+                        let hit = false;
+                        const rand = Math.random();
+                        let cumulativeRate = 0.0;
+                        const rareSkinsExcludingTrotsky = RARE_SKINS.filter(s => s.name !== TOROTUKI_IMG_SRC); // トロツキー以外
+
+                        // レアスキン判定
+                        for (const rare of rareSkinsExcludingTrotsky) {
+                            cumulativeRate += rare.rate;
+                            if (rand < cumulativeRate) {
+                                newSkin = rare.name;
+                                if (ownedSkins.has(newSkin)) {
+                                    resultText = `★${rare.rarity}!!★ [${newSkin}] は既に所持しています`;
+                                } else {
+                                    ownedSkins.add(newSkin);
+                                    updateSkinSelectorUI(); 
+                                    resultText = `<span style="color: #f0f;">★★★${rare.rarity}同志 [${newSkin}] を召喚!!!★★★</span>`;
+                                }
+                                hit = true;
+                                break; 
+                            }
+                        }
+
+                        // 虚無判定 (レアスキンにヒットしなかった場合)
+                        if (!hit) {
+                            resultText = `<span style="color: #aaa;">虚無... 資本主義の奴隷からは何も得られませんでした...</span>`;
+                        }
+                        
+                        document.getElementById('gacha-result').innerText = resultText;
+                        saveData();
+
+                        if (mutekiBalls >= cost) {
+                            gachaButton.disabled = false;
+                        }
+
+                    }, 500);
+                }, 300);
+            }, 100);
+        }
+        // ▲ 追加 ▲
 
         // ==========================================
         // ★★★ スキン一覧 & ハイスコアUI ★★★
@@ -1295,15 +1392,17 @@
             let probabilityText = "";
 
             if (rareInfo) {
-                let percent = rareInfo.rate * 100; // 0.005 -> 0.5, 0.01 -> 1
-                probabilityText = ` (${rareInfo.rarity}, ${percent}%)`;
+                let percent = (rareInfo.rate * 100).toFixed(3).replace(/\.?0+$/, ""); // 小数点以下を整形
+                
+                // レアリティ表示をガチャに応じて変更
+                let gachaTypeLabel = rareInfo.name === TOROTUKI_IMG_SRC ? "ノーマル" : "レア";
+
+                probabilityText = ` (${rareInfo.rarity}, ${gachaTypeLabel}ガチャ ${percent}%)`;
             
             } else if (skinName === CUSTOM_SKIN_ID) {
-                // ▼▼▼ 変更 (GIF対応) ▼▼▼
                 probabilityText = isCustomSkinAnimated ? " (カスタム, GIF)" : " (カスタム)";
-                // ▲▲▲ 変更 ▲▲▲
             } else if (skinName !== 'player.png') {
-                probabilityText = " (通常)";
+                probabilityText = " (ノーマルガチャ)";
             } else {
                 probabilityText = " (初期)";
             }
@@ -1330,9 +1429,7 @@
             uploader.addEventListener('change', (event) => {
                 const file = event.target.files[0];
                 if (file) {
-                    // ▼▼▼ 追加 (ファイルタイプをボタンに保存) ▼▼▼
-                    saveButton.dataset.fileType = file.type; // e.g., 'image/gif'
-                    // ▲▲▲ 追加 ▲▲▲
+                    saveButton.dataset.fileType = file.type; 
 
                     const reader = new FileReader();
                     reader.onload = (e) => {
@@ -1345,7 +1442,7 @@
                     preview.src = '';
                     preview.style.display = 'none';
                     saveButton.disabled = true;
-                    saveButton.dataset.fileType = ''; // ▼ 追加
+                    saveButton.dataset.fileType = ''; 
                 }
             });
         }
@@ -1367,9 +1464,7 @@
             const preview = document.getElementById('custom-skin-preview');
             const saveButton = document.getElementById('custom-skin-save');
             const dataURL = preview.src;
-            // ▼▼▼ 変更 (ファイルタイプを取得) ▼▼▼
             const fileType = saveButton.dataset.fileType; 
-            // ▲▲▲ 変更 ▲▲▲
 
             if (dataURL) {
                 try {
@@ -1377,7 +1472,6 @@
                     localStorage.setItem(CUSTOM_SKIN_KEY, dataURL);
                     customSkinDataURL = dataURL; 
                     
-                    // ▼▼▼ 追加 (ファイルタイプも保存) ▼▼▼
                     if (fileType === 'image/gif') {
                         localStorage.setItem(CUSTOM_SKIN_TYPE_KEY, 'gif');
                         isCustomSkinAnimated = true;
@@ -1386,7 +1480,6 @@
                         localStorage.setItem(CUSTOM_SKIN_TYPE_KEY, 'static');
                         isCustomSkinAnimated = false;
                     }
-                    // ▲▲▲ 追加 ▲▲▲
                     
                     if (!ownedSkins.has(CUSTOM_SKIN_ID)) {
                         ownedSkins.add(CUSTOM_SKIN_ID);
@@ -1418,7 +1511,7 @@
                     skin: currentSkin,
                     highScore: highScore, 
                     highDistance: highDistance,
-                    isAwakeningUnlocked: isAwakeningUnlocked // ▼▼▼ 追加 ▼▼▼
+                    isAwakeningUnlocked: isAwakeningUnlocked 
                 };
                 // ★注意: ここにはカスタムスキンの画像データ(dataURL)は含まれない
                 localStorage.setItem(SAVE_DATA_KEY, JSON.stringify(data));
@@ -1440,7 +1533,7 @@
                     currentSkin = data.skin || 'player.png';
                     highScore = data.highScore || 0; 
                     highDistance = data.highDistance || 0; 
-                    isAwakeningUnlocked = data.isAwakeningUnlocked || false; // ▼▼▼ 追加 ▼▼▼
+                    isAwakeningUnlocked = data.isAwakeningUnlocked || false; 
                     
                     console.log("メインデータをロードしました。", data);
                     
@@ -1450,11 +1543,10 @@
                 console.error("ロードに失敗しました。", e);
             }
 
-            // ▼▼▼ 変更 (カスタムスキンタイプ(GIF)のロード処理) ▼▼▼
             // 2. カスタムスキンデータをロード
             try {
                 const customData = localStorage.getItem(CUSTOM_SKIN_KEY);
-                const customType = localStorage.getItem(CUSTOM_SKIN_TYPE_KEY); // タイプを取得
+                const customType = localStorage.getItem(CUSTOM_SKIN_TYPE_KEY); 
 
                 if (customData) {
                     // カスタムスキンデータ(DataURL)が存在する場合
@@ -1481,7 +1573,6 @@
                 console.error("カスタムスキンのロードに失敗", e);
                 isCustomSkinAnimated = false;
             }
-            // ▲▲▲ 変更 ▲▲▲
 
             // 3. 最終的なスキンを適用
             if (player) { 
@@ -1491,7 +1582,7 @@
             // 4. UIを更新
             updateSkinSelectorUI();
             updateHighScoreUI(); 
-            updateAwakeningUI(); // ▼▼▼ 追加 ▼▼▼
+            updateAwakeningUI(); 
         }
 
         // --- 引き継ぎ画面UI ---
@@ -1529,7 +1620,6 @@
                 const jsonData = atob(base64Code);
                 const data = JSON.parse(jsonData); 
                 
-                // ▼▼▼ 変更 (isAwakeningUnlockedのチェックは任意項目として扱う) ▼▼▼
                 if (data && typeof data.skins !== 'undefined' && typeof data.balls !== 'undefined') {
                     // メインデータのみを保存
                     localStorage.setItem(SAVE_DATA_KEY, jsonData);
@@ -1548,7 +1638,7 @@
         }
 
         // ==========================================
-        // ▼▼▼ 追加 (覚醒スタート用) ▼▼▼
+        // 覚醒スタート用
         // ==========================================
 
         function updateAwakeningUI() {
@@ -1615,7 +1705,7 @@
                 resetGame(true); // ゲームオーバー画面から覚醒スタート
             }
         }
-        // ▲▲▲ 追加 ▼▼▼
+        // ▲▲▲ 追加 ▲▲▲
 
         // スタート
         init();
