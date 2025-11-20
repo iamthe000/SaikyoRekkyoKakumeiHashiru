@@ -161,6 +161,25 @@
         #skin-list-container .skin-prob {
             color: #ff0; font-size: 14px; white-space: nowrap;
         }
+        
+        /* BGM管理用のスタイル */
+        .bgm-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px;
+            border: 1px solid #555;
+            padding: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+        .bgm-controls button {
+            margin-top: 5px;
+            font-size: 14px;
+            padding: 8px 15px;
+            width: 100%;
+        }
 
 
         .hidden { display: none !important; }
@@ -169,6 +188,8 @@
 <body>
 
     <img id="custom-skin-gif-source" style="display: none;" crossOrigin="anonymous">
+    <input type="file" id="bgm-upload-input" accept="audio/*" style="display: none;">
+
     <div id="game-ui">
         <div id="score-board">
             SCORE: <span id="score-val">0</span><br>
@@ -205,7 +226,15 @@
         <button onclick="openGachaSelection()" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 18px;">革命ガチャ（スキン）</button>
         <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         <button onclick="openCustomSkinScreen()" style="background: #0f0; color: #000; margin-top: 10px; font-size: 16px;">オリジナル同志作成</button>
-        <button id="bgm-toggle-start" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
+        
+        <div class="bgm-controls">
+            <button id="bgm-toggle-start" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 0; font-size: 16px;">BGM: OFF</button>
+            <div style="display: flex; gap: 5px; width: 100%;">
+                <button onclick="triggerBGMUpload()" style="background: #666; color: white; font-size: 12px; padding: 5px;">🎵 BGM変更 (UP)</button>
+                <button onclick="resetDefaultBGM()" style="background: #666; color: white; font-size: 12px; padding: 5px;">↩ デフォルト</button>
+            </div>
+        </div>
+
         <button onclick="location.href='https://github.com/iamthe000/SaikyoRekkyoKakumeiHashiru/blob/main/index.html'" style="background: #444; color: white;padding: 5px; margin-top: 30px; font-size: 8px;">このゲームのソースコードはGitHubで公開されています</button>
 
         </div>
@@ -236,7 +265,14 @@
         <button onclick="openSkinListScreen()" style="background: #0ff; color: #000; margin-top: 10px; font-size: 16px;">同志一覧</button> <button onclick="openSaveLoadScreen()" style="background: #0a0; color: white; margin-top: 10px; font-size: 16px;">データ引き継ぎ</button>
         <button onclick="openCustomSkinScreen()" style="background: #0f0; color: #000; margin-top: 10px; font-size: 16px;">オリジナル同志作成</button>
         
-        <button id="bgm-toggle-over" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 10px; font-size: 16px;">BGM: OFF</button>
+        <div class="bgm-controls">
+            <button id="bgm-toggle-over" onclick="toggleBGM()" style="background: #444; color: white; margin-top: 0; font-size: 16px;">BGM: OFF</button>
+            <div style="display: flex; gap: 5px; width: 100%;">
+                <button onclick="triggerBGMUpload()" style="background: #666; color: white; font-size: 12px; padding: 5px;">🎵 BGM変更 (UP)</button>
+                <button onclick="resetDefaultBGM()" style="background: #666; color: white; font-size: 12px; padding: 5px;">↩ デフォルト</button>
+            </div>
+        </div>
+
         </div>
 
     <div id="gacha-selection-screen" class="hidden">
@@ -391,6 +427,7 @@
         const BERLIN_WALL_IMG_SRC = 'BerlinWall.jpg'; // ▼ 追加: レアガチャ用ターゲット画像
 
         // BGM用
+        const DEFAULT_BGM_SRC = 'bgm.mp3'; // ★デフォルトBGMのパス
         let bgmElement;
         let isBGMEnabled = false; 
         const BGM_SAVE_KEY = 'revolutionRunBGM';
@@ -414,7 +451,17 @@
             
             // シーン
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x110022); 
+            
+            // ★変更: 背景画像の読み込み (kremlin.jpg)
+            // フォグとブレンドさせず、背景に固定表示させる
+            textureLoader.load('kremlin.jpg', function(texture) {
+                scene.background = texture;
+            }, undefined, function(err) {
+                // 読み込み失敗時のフォールバック
+                console.log("背景画像読み込み失敗、単色にします");
+                scene.background = new THREE.Color(0x110022);
+            });
+
             scene.fog = new THREE.FogExp2(0x110022, 0.02);
 
             // カメラ
@@ -444,12 +491,9 @@
             // プレイヤー生成
             createPlayer();
 
-            // ▼ 変更: 初期化時の画像セットアップを削除し、openGachaSelectionへ移譲
-            // setupGachaImages(); 
-            // ▲ 変更
-
             // ▼▼▼ 追加/変更 ▼▼▼
             setupCustomSkinUploader();
+            setupBGMUploader(); // ★BGMアップロード設定
             customSkinGifElement = document.getElementById('custom-skin-gif-source');
             // ▲▲▲ 追加/変更 ▲▲▲
 
@@ -962,8 +1006,41 @@
         }
 
         // ==========================================
-        // BGM管理
+        // BGM管理 & アップロード機能 (★変更箇所)
         // ==========================================
+
+        function setupBGMUploader() {
+            const input = document.getElementById('bgm-upload-input');
+            input.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    // オブジェクトURLを生成してBGMソースに設定
+                    const objectUrl = URL.createObjectURL(file);
+                    bgmElement.src = objectUrl;
+                    
+                    // 強制的にONにする
+                    isBGMEnabled = true;
+                    updateBGMButtonUI();
+                    playBGM();
+                    
+                    alert("BGMを変更しました！(※再読み込みでリセットされます)");
+                }
+                // input値をリセットして同じファイルを再選択できるようにする
+                input.value = '';
+            });
+        }
+
+        function triggerBGMUpload() {
+            document.getElementById('bgm-upload-input').click();
+        }
+
+        function resetDefaultBGM() {
+            bgmElement.src = DEFAULT_BGM_SRC;
+            alert("デフォルトのBGMに戻しました。");
+            if (isBGMEnabled) {
+                playBGM();
+            }
+        }
 
         function playBGM() {
             if (isBGMEnabled && bgmElement && !isPaused) {
