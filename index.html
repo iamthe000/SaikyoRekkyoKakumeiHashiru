@@ -452,9 +452,9 @@
             // シーン
             scene = new THREE.Scene();
             
-            // ★変更: 背景画像の読み込み (kremlin.jpg)
+            // ★変更: 背景画像の読み込み (kremlin.PNG)
             // フォグとブレンドさせず、背景に固定表示させる
-            textureLoader.load('kremlin.jpg', function(texture) {
+            textureLoader.load('kremlin.PNG', function(texture) {
                 scene.background = texture;
             }, undefined, function(err) {
                 // 読み込み失敗時のフォールバック
