@@ -285,8 +285,8 @@
         <button onclick="openGacha('normal')" style="background: linear-gradient(45deg, #0ff, #00f); color: white; margin-top: 10px; font-size: 20px;">
             トロツキーワクワクガチャ (ノーマル)
         </button>
-        <button onclick="" style="background: #444; color: white; margin-top: 10px; font-size: 16px;" disabled>
-            期間限定ガチャ (開発中)
+        <button onclick="openGacha('schlieffen')" style="background: linear-gradient(45deg, #8B4513, #D2691E); color: white; margin-top: 10px; font-size: 20px;">
+            Schlieffen-Plan
         </button>
         <button onclick="closeGachaSelection()" style="background: #555; font-size: 16px; margin-top: 30px;">戻る</button>
     </div>
@@ -441,6 +441,15 @@
             { name: 'ejof.png', rate: 0.01, rarity: "超革命的" }, 
             { name: 'matoryo.png', rate: 0.1, rarity: "超革命的" }, // 10%
             { name: TOROTUKI_IMG_SRC, rate: 0.01, rarity: "革命的" } // 1% (元の1%)
+        ];
+
+        const SCHLIEFFEN_SKINS = [
+            { name: 'tyobihige.png', rarity: "通常" },
+            { name: 'gepperusu.png', rarity: "通常" },
+            { name: 'geringu.png', rarity: "通常" },
+            { name: 'himura.png', rarity: "通常" },
+            { name: 'hesu.png', rarity: "レア" },
+            { name: 'tibihitora.png', rarity: "レア" }
         ];
 
         // ==========================================
@@ -1207,6 +1216,13 @@
                 gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
                 gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br><span style="color: #f00;">レア同志以外は虚無（何も得られない）</span>`;
                 gachaButton.onclick = runRareGacha;
+            } else if (type === 'schlieffen') {
+                cost = 30;
+                gachaTitle.innerText = "Schlieffen-Plan";
+                img.src = 'schlieffen.png';
+                gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br>期間限定同志`;
+                gachaButton.onclick = runSchlieffenGacha;
             } else {
                 // ここには来ない想定
                 return;
@@ -1238,6 +1254,8 @@
                 runNormalGacha();
             } else if (currentGachaType === 'rare') {
                 runRareGacha();
+            } else if (currentGachaType === 'schlieffen') {
+                runSchlieffenGacha();
             }
         }
 
@@ -1370,6 +1388,80 @@
                         // 虚無判定 (レアスキンにヒットしなかった場合)
                         if (!hit) {
                             resultText = `<span style="color: #aaa;">虚無... 資本主義の奴隷からは何も得られませんでした...</span>`;
+                        }
+                        
+                        document.getElementById('gacha-result').innerHTML = resultText;
+                        saveData();
+
+                        if (mutekiBalls >= cost) {
+                            gachaButton.disabled = false;
+                        }
+
+                    }, 500);
+                }, 300);
+            }, 100);
+        }
+
+        function runSchlieffenGacha() {
+            const cost = 30;
+            if (mutekiBalls < cost) {
+                document.getElementById('gacha-result').innerText = "無敵ボールが足りません！";
+                return;
+            }
+
+            const gachaButton = document.getElementById('gacha-button');
+            gachaButton.disabled = true;
+
+            mutekiBalls -= cost;
+            updateMutekiCountUI(); 
+            document.getElementById('gacha-muteki-count').innerText = mutekiBalls; 
+            updateAwakeningUI();
+            
+            const pickaxe = document.getElementById('pickaxe');
+            const imgContainer = document.getElementById('torotuki-container');
+            
+            pickaxe.style.opacity = '1';
+            pickaxe.style.top = '-50px';
+            pickaxe.style.right = '-50px';
+            
+            setTimeout(() => {
+                pickaxe.style.transform = 'translate(-80px, 80px) rotate(-45deg)'; 
+                
+                setTimeout(() => {
+                    imgContainer.classList.add('shake');
+                    
+                    setTimeout(() => {
+                        imgContainer.classList.remove('shake');
+                        
+                        let newSkin = "";
+                        let resultText = "";
+                        
+                        const rand = Math.random();
+                        let cumulativeRate = 0.0;
+                        
+                        const gachaPool = SCHLIEFFEN_SKINS.map(skin => {
+                            let rate = 0;
+                            if (skin.rarity === "通常") {
+                                rate = 0.2;
+                            } else if (skin.rarity === "レア") {
+                                rate = 0.1;
+                            }
+                            return { ...skin, rate };
+                        });
+
+                        for (const skin of gachaPool) {
+                            cumulativeRate += skin.rate;
+                            if (rand < cumulativeRate) {
+                                newSkin = skin.name;
+                                if (ownedSkins.has(newSkin)) {
+                                    resultText = `★${skin.rarity}!!★ [${newSkin}] は既に所持しています`;
+                                } else {
+                                    ownedSkins.add(newSkin);
+                                    updateSkinSelectorUI(); 
+                                    resultText = `<span style="color: #f0f;">★★★${skin.rarity}同志 [${newSkin}] を召喚!!!★★★</span>`;
+                                }
+                                break; 
+                            }
                         }
                         
                         document.getElementById('gacha-result').innerHTML = resultText;
