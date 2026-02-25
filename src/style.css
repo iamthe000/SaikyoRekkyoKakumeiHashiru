@@ -1,0 +1,169 @@
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Impact', sans-serif; 
+            background: #000; 
+            touch-action: none; 
+        }
+        
+        #game-ui { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            pointer-events: none; 
+        }
+        
+        /* スコア・情報表示 */
+        #score-board {
+            position: absolute; 
+            top: calc(10px + env(safe-area-inset-top)); 
+            left: calc(10px + env(safe-area-inset-left));
+            color: yellow; 
+            font-size: 24px; 
+            text-shadow: 2px 2px 0 #f0f; 
+            z-index: 10; 
+        }
+        #muteki-count { color: cyan; font-size: 20px; }
+
+        /* 一時停止ボタン */
+        #pause-button {
+            position: absolute;
+            top: calc(10px + env(safe-area-inset-top));
+            right: calc(10px + env(safe-area-inset-right));
+            font-size: 24px;
+            font-weight: bold;
+            background: #ff0;
+            color: #000;
+            border: 2px solid #fff;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            pointer-events: auto; /* ★重要 */
+            z-index: 15;
+            padding: 0;
+            line-height: 36px;
+        }
+        
+        /* オーバーレイ共通 */
+        #start-screen, #game-over-screen, #gacha-selection-screen, #gacha-screen, #save-load-screen, #pause-screen, #skin-list-screen, #custom-skin-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: auto; z-index: 20;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+            box-sizing: border-box;
+            overflow-y: auto; /* コンテンツが多い場合にスクロール */
+        }
+        
+        h1 { 
+            color: #ff0055; 
+            font-size: 40px; 
+            margin-bottom: 10px; 
+            text-transform: uppercase; 
+            transform: rotate(-2deg); 
+            text-shadow: 4px 4px 0 #fff; 
+            text-align: center;
+        }
+
+        /* ▼▼▼ 追加: タイトルロゴ画像用スタイル ▼▼▼ */
+        #title-logo {
+            max-width: 90%;      /* 画面からはみ出さないように */
+            height: auto;        /* 比率を維持 */
+            margin-bottom: 20px;
+            filter: drop-shadow(4px 4px 0 #fff); /* 元のテキストのような影をつける */
+            transform: rotate(-2deg); /* 元のテキストのような傾きをつける */
+        }
+        /* ▲▲▲ 追加 ▲▲▲ */
+
+        p { color: white; text-align: center; max-width: 80%; }
+        
+        button {
+            background: linear-gradient(45deg, #ff0, #f0f); border: none; padding: 15px 40px;
+            font-size: 24px; font-weight: bold; color: #000; cursor: pointer; margin-top: 20px;
+            transform: skew(-10deg); box-shadow: 5px 5px 0 #fff;
+        }
+        button:active { transform: skew(-10deg) translate(2px, 2px); box-shadow: 3px 3px 0 #fff; }
+        button:disabled {
+            background: #777;
+            color: #aaa;
+            box-shadow: 5px 5px 0 #555;
+            cursor: not-allowed;
+        }
+
+        /* ガチャ演出用 */
+        #torotuki-container { position: relative; width: 200px; height: 200px; margin-bottom: 20px; }
+        #torotuki-img { width: 100%; height: 100%; object-fit: contain; transition: filter 0.1s; }
+        #pickaxe { 
+            position: absolute; top: -50px; right: -50px; font-size: 60px; 
+            transition: transform 0.3s ease-in; opacity: 0; 
+        }
+        #gacha-info {
+            color: white; font-size: 18px; text-align: center;
+        }
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            /* (中略) */
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        /* データ引き継ぎ用 */
+        #save-load-screen textarea {
+            width: 80%;
+            height: 100px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        #skin-list-container {
+            width: 80%; max-width: 500px; height: 60vh; 
+            background: #222; border: 2px solid #0ff; 
+            overflow-y: auto; padding: 10px; 
+            box-sizing: border-box; text-align: left;
+        }
+        #skin-list-container h3 {
+            color: white; margin: 15px 0 5px 0;
+            border-bottom: 1px solid #555;
+        }
+        #skin-list-container div {
+            padding: 8px; border-bottom: 1px solid #444; 
+            display: flex; justify-content: space-between; 
+            align-items: center; flex-wrap: wrap;
+        }
+        #skin-list-container .owned {
+            color: #0f0; font-weight: bold; white-space: nowrap; padding-right: 10px;
+        }
+        #skin-list-container .not-owned {
+            color: #888; white-space: nowrap; padding-right: 10px;
+        }
+        #skin-list-container .skin-prob {
+            color: #ff0; font-size: 14px; white-space: nowrap;
+        }
+        
+        /* BGM管理用のスタイル */
+        .bgm-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 10px;
+            border: 1px solid #555;
+            padding: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+        .bgm-controls button {
+            margin-top: 5px;
+            font-size: 14px;
+            padding: 8px 15px;
+            width: 100%;
+        }
+
+
+        .hidden { display: none !important; }
