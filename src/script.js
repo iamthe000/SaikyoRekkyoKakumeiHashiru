@@ -53,6 +53,13 @@
         let jumpVelocity = 0;
         let gravity = -35;
         let crouchTimer = 0;
+        let isOnPlatform = false;
+        let currentPlatformTopY = 0.75;
+        let currentPlatform = null;
+        let currentPlatformHalfDepth = 0;
+        let isDroppingFromPlatform = false;
+        let platformDropVelocity = 0;
+        let platformDropTargetY = 0.75;
 
         // オブジェクト管理
         let obstacles = [];
@@ -259,19 +266,274 @@
             return new THREE.CanvasTexture(canvas);
         }
 
-        // 「無敵」ボールのテクスチャ生成
-        function createMutekiTexture() {
+        function createPlatformMaterial(color) {
+            return new THREE.MeshStandardMaterial({
+                color,
+                roughness: 0.95,
+                metalness: 0.02,
+                transparent: false,
+                opacity: 1,
+                depthWrite: true,
+                depthTest: true,
+                fog: false,
+                side: THREE.DoubleSide,
+                alphaTest: 0
+            });
+        }
+
+        function createStripedTexture(baseColor, stripeColor, stripeWidth = 14) {
             const canvas = document.createElement('canvas');
-            canvas.width = 128; canvas.height = 128;
+            canvas.width = 128;
+            canvas.height = 128;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
-            ctx.beginPath(); ctx.arc(64, 64, 64, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 40px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('無敵', 64, 64);
-            return new THREE.CanvasTexture(canvas);
+
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(0, 0, 128, 128);
+
+            ctx.fillStyle = stripeColor;
+            for (let x = -128; x < 256; x += stripeWidth * 2) {
+                ctx.save();
+                ctx.translate(x, 0);
+                ctx.rotate(-Math.PI / 4);
+                ctx.fillRect(0, -40, stripeWidth, 240);
+                ctx.restore();
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(1, 1);
+            return texture;
+        }
+
+        function createDecoratedBall(posX) {
+            const group = new THREE.Group();
+            const sphere = new THREE.Mesh(
+                new THREE.SphereGeometry(0.55, 28, 20),
+                new THREE.MeshStandardMaterial({
+                    color: 0xffd84d,
+                    roughness: 0.35,
+                    metalness: 0.35,
+                    emissive: 0x331a00,
+                    emissiveIntensity: 0.18
+                })
+            );
+            group.add(sphere);
+
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(0.42, 0.08, 10, 20),
+                new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    roughness: 0.2,
+                    metalness: 0.1,
+                    emissive: 0xffaa00,
+                    emissiveIntensity: 0.25
+                })
+            );
+            ring.rotation.x = Math.PI / 2;
+            group.add(ring);
+
+            const core = new THREE.Mesh(
+                new THREE.SphereGeometry(0.18, 16, 12),
+                new THREE.MeshStandardMaterial({
+                    color: 0xff3300,
+                    roughness: 0.6,
+                    metalness: 0.05,
+                    emissive: 0x550000,
+                    emissiveIntensity: 0.2
+                })
+            );
+            group.add(core);
+
+            group.position.set(posX, 0.55, -50);
+            group.userData = { type: 'ball', isObstacle: true };
+            return group;
+        }
+
+        function createDecoratedWall(posX) {
+            const group = new THREE.Group();
+            const texture = createStripedTexture('#b70000', '#f6d400', 16);
+            const main = new THREE.Mesh(
+                new THREE.BoxGeometry(2.7, 1.25, 0.55),
+                new THREE.MeshStandardMaterial({
+                    color: 0xaa1111,
+                    map: texture,
+                    roughness: 0.9,
+                    metalness: 0.04,
+                    emissive: 0x220000,
+                    emissiveIntensity: 0.06
+                })
+            );
+            main.position.y = 0.65;
+            group.add(main);
+
+            const topCap = new THREE.Mesh(
+                new THREE.BoxGeometry(2.85, 0.15, 0.65),
+                new THREE.MeshStandardMaterial({
+                    color: 0x5a0000,
+                    roughness: 0.75,
+                    metalness: 0.05
+                })
+            );
+            topCap.position.y = 1.28;
+            group.add(topCap);
+
+            const base = new THREE.Mesh(
+                new THREE.BoxGeometry(2.85, 0.18, 0.65),
+                new THREE.MeshStandardMaterial({
+                    color: 0x4a0000,
+                    roughness: 0.9,
+                    metalness: 0.02
+                })
+            );
+            base.position.y = -0.02;
+            group.add(base);
+
+            const braceGeo = new THREE.BoxGeometry(0.12, 1.05, 0.08);
+            const braceMat = new THREE.MeshStandardMaterial({ color: 0xffe066, roughness: 0.5, metalness: 0.2 });
+            const leftBrace = new THREE.Mesh(braceGeo, braceMat);
+            leftBrace.position.set(-1.0, 0.68, 0.31);
+            leftBrace.rotation.z = 0.06;
+            group.add(leftBrace);
+
+            const rightBrace = leftBrace.clone();
+            rightBrace.position.x = 1.0;
+            rightBrace.rotation.z = -0.06;
+            group.add(rightBrace);
+
+            group.position.set(posX, 0, -50);
+            group.userData = { type: 'wall', isObstacle: true };
+            return group;
+        }
+
+        function createDecoratedTunnel(posX) {
+            const group = new THREE.Group();
+            const outer = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.5, 1.5, 1.0, 16, 1, true, 0, Math.PI),
+                new THREE.MeshStandardMaterial({ color: 0x888888, side: THREE.DoubleSide })
+            );
+            outer.rotation.z = Math.PI / 2;
+            outer.rotation.y = Math.PI / 2;
+            group.add(outer);
+
+            const inner = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.26, 1.26, 0.92, 16, 1, true, 0, Math.PI),
+                new THREE.MeshStandardMaterial({ color: 0x222222, side: THREE.DoubleSide })
+            );
+            inner.rotation.z = Math.PI / 2;
+            inner.rotation.y = Math.PI / 2;
+            group.add(inner);
+
+            group.position.set(posX, 0.5, -50);
+            group.userData = { type: 'tunnel', isObstacle: true };
+            return group;
+        }
+
+        function createDecoratedPillar(posX) {
+            const group = new THREE.Group();
+            const shaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.58, 0.72, 4.0, 10, 1),
+                new THREE.MeshStandardMaterial({
+                    color: 0x6329b8,
+                    roughness: 0.88,
+                    metalness: 0.04,
+                    emissive: 0x15002c,
+                    emissiveIntensity: 0.05
+                })
+            );
+            shaft.position.y = 2.0;
+            group.add(shaft);
+
+            const base = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.88, 0.96, 0.28, 10),
+                new THREE.MeshStandardMaterial({
+                    color: 0x3f186f,
+                    roughness: 0.9,
+                    metalness: 0.02
+                })
+            );
+            base.position.y = 0.14;
+            group.add(base);
+
+            const capital = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.78, 0.72, 0.28, 10),
+                new THREE.MeshStandardMaterial({
+                    color: 0x8d63ff,
+                    roughness: 0.75,
+                    metalness: 0.12
+                })
+            );
+            capital.position.y = 3.86;
+            group.add(capital);
+
+            const bandMat = new THREE.MeshStandardMaterial({
+                color: 0xe6d1ff,
+                roughness: 0.4,
+                metalness: 0.05,
+                emissive: 0x2b103f,
+                emissiveIntensity: 0.08
+            });
+            for (let y = 0.8; y <= 3.2; y += 0.8) {
+                const band = new THREE.Mesh(new THREE.TorusGeometry(0.64, 0.06, 8, 14), bandMat);
+                band.rotation.x = Math.PI / 2;
+                band.position.y = y;
+                group.add(band);
+            }
+
+            group.position.set(posX, 0, -50);
+            group.userData = { type: 'pillar', isObstacle: true };
+            return group;
+        }
+
+        function createDecoratedPlatform(posX, railLength) {
+            const group = new THREE.Group();
+            const deckGeo = new THREE.BoxGeometry(3.8, 0.45, railLength);
+            const deckMat = createPlatformMaterial(0xb9933a);
+            const deck = new THREE.Mesh(deckGeo, deckMat);
+            deck.position.y = 0;
+            deck.renderOrder = 10;
+            group.add(deck);
+
+            const plankTexture = createStripedTexture('#8b651f', '#d1b15a', 24);
+            const plankMat = new THREE.MeshStandardMaterial({
+                color: 0xb38c3c,
+                map: plankTexture,
+                roughness: 0.96,
+                metalness: 0.01,
+                fog: false
+            });
+            const plank = new THREE.Mesh(new THREE.BoxGeometry(3.35, 0.06, railLength - 0.25), plankMat);
+            plank.position.set(0, 0.245, 0);
+            plank.renderOrder = 11;
+            group.add(plank);
+
+            const leftRail = new THREE.Mesh(
+                new THREE.BoxGeometry(0.18, 1.2, railLength),
+                createPlatformMaterial(0x5b3a11)
+            );
+            leftRail.position.set(-1.8, 0.35, 0);
+            leftRail.renderOrder = 11;
+            group.add(leftRail);
+
+            const rightRail = leftRail.clone();
+            rightRail.position.x = 1.8;
+            group.add(rightRail);
+
+            const supportSpacing = 6;
+            for (let z = -railLength * 0.5 + 2; z < railLength * 0.5; z += supportSpacing) {
+                const support = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.35, 3.1, 0.35),
+                    createPlatformMaterial(0x6a4216)
+                );
+                support.position.set(0, -1.1, z);
+                support.renderOrder = 11;
+                group.add(support);
+            }
+
+            const groupHalfDepth = railLength * 0.5;
+            group.position.set(posX, 2.9, -50 - groupHalfDepth);
+            group.userData = { type: 'platform', isObstacle: true, halfDepth: groupHalfDepth, halfHeight: 0.225 };
+            return group;
         }
 
         // ==========================================
@@ -306,7 +568,18 @@
 
             player.position.x += (targetX - player.position.x) * 10 * dt;
 
-            if (isJumping) {
+            if (isDroppingFromPlatform) {
+                platformDropVelocity += gravity * dt * 0.75;
+                player.position.y += platformDropVelocity * dt;
+                player.scale.y = THREE.MathUtils.lerp(player.scale.y, 0.78, 10 * dt);
+                if (player.position.y <= platformDropTargetY) {
+                    player.position.y = platformDropTargetY;
+                    isDroppingFromPlatform = false;
+                    platformDropVelocity = 0;
+                    player.scale.y = 1.0;
+                    if (player.material) player.material.needsUpdate = true;
+                }
+            } else if (isJumping) {
                 player.position.y += jumpVelocity * dt;
                 jumpVelocity += gravity * dt;
 
@@ -316,6 +589,8 @@
                         player.position.y = 0.375;
                         isJumping = false;
                         jumpVelocity = 0;
+                        player.scale.y = 1.0;
+                        if (player.material) player.material.needsUpdate = true;
                     }
                 } else {
                     player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
@@ -323,6 +598,8 @@
                         player.position.y = 0.75;
                         isJumping = false;
                         jumpVelocity = 0;
+                        player.scale.y = 1.0;
+                        if (player.material) player.material.needsUpdate = true;
                     }
                 }
             
@@ -337,11 +614,13 @@
             } else {
                 player.scale.y = THREE.MathUtils.lerp(player.scale.y, 1.0, 15 * dt);
                 player.position.y = 0.75;
+                if (!isCrouching) player.scale.y = 1.0;
             }
 
+            handlePlatformLanding();
             player.lookAt(camera.position);
 
-            if (Math.random() < 0.05) {
+            if (Math.random() < 0.025) {
                 spawnObstacle();
             }
 
@@ -360,7 +639,14 @@
                     }
                 }
 
-                if (obj.position.z > 5) {
+                const removalZ = obj.userData.type === 'platform'
+                    ? obj.position.z - (obj.userData.halfDepth || 6)
+                    : obj.position.z;
+
+                if (removalZ > 5) {
+                    if (obj === currentPlatform) {
+                        beginPlatformDrop(0.75);
+                    }
                     scene.remove(obj);
                     obstacles.splice(i, 1);
                 }
@@ -385,35 +671,27 @@
                 typeRand = Math.random() * 0.7; // pillarでない障害物を強制的に生成
             }
 
-            let mesh;
+            if (isLaneBlockedForSpawn(laneIndex)) return;
+
             let type = '';
+            let mesh;
 
             if (typeRand < 0.2) {
-                const geometry = new THREE.SphereGeometry(0.5, 16, 16);
-                const material = new THREE.MeshBasicMaterial({ map: createMutekiTexture() });
-                mesh = new THREE.Mesh(geometry, material);
-                mesh.position.set(posX, 0.5, -50);
                 type = 'ball';
+                mesh = createDecoratedBall(posX);
             } else if (typeRand < 0.5) {
-                const geometry = new THREE.BoxGeometry(2.5, 1.2, 0.5);
-                const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-                mesh = new THREE.Mesh(geometry, material);
-                mesh.position.set(posX, 0.6, -50);
                 type = 'wall';
+                mesh = createDecoratedWall(posX);
             } else if (typeRand < 0.7) {
-                const geometry = new THREE.CylinderGeometry(1.5, 1.5, 1.0, 16, 1, true, 0, Math.PI);
-                const material = new THREE.MeshStandardMaterial({ color: 0x888888, side: THREE.DoubleSide });
-                mesh = new THREE.Mesh(geometry, material);
-                mesh.rotation.z = Math.PI / 2; 
-                mesh.rotation.y = Math.PI / 2;
-                mesh.position.set(posX, 0.5, -50);
                 type = 'tunnel';
-            } else {
-                const geometry = new THREE.BoxGeometry(1, 4, 1);
-                const material = new THREE.MeshStandardMaterial({ color: 0x5500aa });
-                mesh = new THREE.Mesh(geometry, material);
-                mesh.position.set(posX, 2, -50);
+                mesh = createDecoratedTunnel(posX);
+            } else if (typeRand < 0.85) {
                 type = 'pillar';
+                mesh = createDecoratedPillar(posX);
+            } else {
+                const railLength = 18 + Math.floor(Math.random() * 3) * 6;
+                type = 'platform';
+                mesh = createDecoratedPlatform(posX, railLength);
             }
 
             // 履歴を更新
@@ -422,9 +700,110 @@
                 lastObstacleTypes.shift();
             }
 
-            mesh.userData = { type: type, isObstacle: true };
+            if (type !== 'platform') {
+                mesh.userData = { type: type, isObstacle: true };
+            }
             scene.add(mesh);
             obstacles.push(mesh);
+        }
+
+        function isPlayerOverPlatform(obj) {
+            const halfDepth = obj.userData.halfDepth || 6;
+            const halfWidth = 1.8;
+            return (
+                Math.abs(obj.position.x - player.position.x) <= halfWidth &&
+                player.position.z >= obj.position.z - halfDepth &&
+                player.position.z <= obj.position.z + halfDepth
+            );
+        }
+
+        function beginPlatformDrop(targetY = 0.75) {
+            if (isDroppingFromPlatform) return;
+            isOnPlatform = false;
+            currentPlatform = null;
+            currentPlatformTopY = targetY;
+            currentPlatformHalfDepth = 0;
+            isDroppingFromPlatform = true;
+            platformDropVelocity = Math.min(platformDropVelocity, 0);
+            platformDropTargetY = targetY;
+            isJumping = false;
+            jumpVelocity = 0;
+        }
+
+        function findNearbyPlatform(laneX, playerZ) {
+            let best = null;
+            let bestScore = Infinity;
+
+            for (const obj of obstacles) {
+                if (obj.userData.type !== 'platform') continue;
+                const halfDepth = obj.userData.halfDepth || 6;
+                const halfWidth = 2.5;
+                const withinLane = Math.abs(obj.position.x - laneX) <= halfWidth;
+                const withinZ = playerZ >= obj.position.z - halfDepth && playerZ <= obj.position.z + halfDepth;
+                if (!withinLane || !withinZ) continue;
+
+                const score = Math.abs(obj.position.x - laneX) + Math.abs(playerZ - obj.position.z) * 0.2;
+                if (score < bestScore) {
+                    best = obj;
+                    bestScore = score;
+                }
+            }
+
+            return best;
+        }
+
+        function handlePlatformLanding() {
+            if (isDroppingFromPlatform) return;
+
+            if (isJumping && jumpVelocity <= 0) {
+                for (const obj of obstacles) {
+                    if (obj.userData.type !== 'platform') continue;
+                    const halfDepth = obj.userData.halfDepth || 6;
+                    if (!isPlayerOverPlatform(obj)) continue;
+
+                    const topY = obj.position.y + (obj.userData.halfHeight || 0.225) + 0.75;
+                    const fallingTowardTop = player.position.y >= topY - 1.8 && player.position.y <= topY + 1.2;
+                    if (fallingTowardTop) {
+                        isOnPlatform = true;
+                        currentPlatform = obj;
+                        currentPlatformTopY = topY;
+                        currentPlatformHalfDepth = halfDepth;
+                        player.position.y = topY;
+                        isJumping = false;
+                        jumpVelocity = 0;
+                        break;
+                    }
+                }
+
+            }
+
+            if (isOnPlatform && currentPlatform) {
+                const targetPlatform = findNearbyPlatform(targetX, player.position.z);
+                if (targetPlatform && targetPlatform !== currentPlatform && Math.abs(targetPlatform.position.x - player.position.x) <= 3.0) {
+                    currentPlatform = targetPlatform;
+                    currentPlatformHalfDepth = targetPlatform.userData.halfDepth || 6;
+                    const topY = targetPlatform.position.y + (targetPlatform.userData.halfHeight || 0.225) + 0.75;
+                    currentPlatformTopY = topY;
+                    player.position.y = topY;
+                    player.scale.y = 1.0;
+                }
+
+                currentPlatformTopY = currentPlatform.position.y + (currentPlatform.userData.halfHeight || 0.225) + 0.75;
+                player.position.y = currentPlatformTopY;
+                player.scale.y = 1.0;
+                if (!isPlayerOverPlatform(currentPlatform)) {
+                    const adjacent = findNearbyPlatform(targetX, player.position.z);
+                    if (adjacent && adjacent !== currentPlatform && Math.abs(adjacent.position.x - player.position.x) <= 3.0) {
+                        currentPlatform = adjacent;
+                        currentPlatformHalfDepth = adjacent.userData.halfDepth || 6;
+                        currentPlatformTopY = adjacent.position.y + (adjacent.userData.halfHeight || 0.225) + 0.75;
+                        player.position.y = currentPlatformTopY;
+                        player.scale.y = 1.0;
+                    } else {
+                        beginPlatformDrop(0.75);
+                    }
+                }
+            }
         }
 
         // ==========================================
@@ -451,7 +830,28 @@
                 }
             } else if (type === 'pillar') {
                 gameOver();
+            } else if (type === 'platform') {
+                // 足場は障害物ではなく乗れる地形なので、接触しても何もしない
             }
+        }
+
+        function isLaneBlockedForSpawn(laneIndex) {
+            const x = laneIndex * LANE_WIDTH;
+            const spawnZ = -55;
+            const minGapZ = 14;
+
+            for (const obj of obstacles) {
+                if (Math.abs(obj.position.x - x) > 0.9) continue;
+                if (Math.abs(obj.position.z - spawnZ) < minGapZ) return true;
+
+                if (obj.userData.type === 'platform') {
+                    const halfDepth = obj.userData.halfDepth || 6;
+                    if (spawnZ >= obj.position.z - halfDepth - 2 && spawnZ <= obj.position.z + halfDepth + 2) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         // 無敵ボールのUIを更新する関数
@@ -518,6 +918,9 @@
 
         function doJump() {
             if (!isJumping) {
+                isOnPlatform = false;
+                currentPlatform = null;
+                currentPlatformHalfDepth = 0;
                 isJumping = true;
                 jumpVelocity = 12;
             }
@@ -571,7 +974,6 @@
             
             obstacles.forEach(o => scene.remove(o));
             obstacles = [];
-            
             resetGameVals();
             updateSkinSelectorUI();
             updateHighScoreUI(); 
@@ -638,6 +1040,9 @@
             isPaused = false; 
             jumpVelocity = 0;
             crouchTimer = 0;
+            isOnPlatform = false;
+            currentPlatform = null;
+            currentPlatformTopY = 0.75;
             
             document.getElementById('score-val').innerText = score;
             document.getElementById('distance-val').innerText = Math.floor(distance);
@@ -1498,4 +1903,3 @@
 
         // スタート
         init();
-
