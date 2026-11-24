@@ -80,7 +80,8 @@
             { name: 'ejof.png', rate: 0.01, rarity: "超革命的" }, 
             { name: 'matoryo.png', rate: 0.1, rarity: "超革命的" }, // 10%
             { name: TOROTUKI_IMG_SRC, rate: 0.01, rarity: "革命的" }, // 1% (元の1%)
-         { name: 'nicholas_II.png', rate: 0.01, rarity: "革命的" }
+         { name: 'nicholas_II.png', rate: 0.01, rarity: "革命的" },
+         { name: 'mishima_speak.jpg', rate: 0.01, rarity: "革命的" }
         ];
 
         const SCHLIEFFEN_SKINS = [
