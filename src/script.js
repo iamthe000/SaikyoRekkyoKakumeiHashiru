@@ -26,8 +26,8 @@
         let ownedSkins = new Set(['player.png']); // デフォルトスキン
         const NORMAL_GACHA_COST = 10; // ▼ 変更: トロツキーワクワクガチャのコスト
         const RARE_GACHA_COST = 150; // はずれなしのため大幅値上げ
-        const SCHLIEFFEN_GACHA_COST = 200; // はずれなしの記念ガチャ
-        const REVIVAL_GACHA_COST = 300; // 復活記念ガチャ
+        const SCHLIEFFEN_GACHA_COST = 170; // はずれなしの記念ガチャ
+        const REVIVAL_GACHA_COST = 170; // 復活記念ガチャ
         let currentGachaType = 'normal'; // ▼ 追加: 現在開いているガチャの種類 ('normal' or 'rare')
 
         const SKIN_LIST = [
