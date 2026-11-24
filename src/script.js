@@ -25,7 +25,9 @@
         let currentSkin = 'player.png';
         let ownedSkins = new Set(['player.png']); // デフォルトスキン
         const NORMAL_GACHA_COST = 10; // ▼ 変更: トロツキーワクワクガチャのコスト
-        const RARE_GACHA_COST = 20; // ▼ 追加: 資本主義の奴隷ガチャのコスト
+        const RARE_GACHA_COST = 150; // はずれなしのため大幅値上げ
+        const SCHLIEFFEN_GACHA_COST = 200; // はずれなしの記念ガチャ
+        const REVIVAL_GACHA_COST = 300; // 復活記念ガチャ
         let currentGachaType = 'normal'; // ▼ 追加: 現在開いているガチャの種類 ('normal' or 'rare')
 
         const SKIN_LIST = [
@@ -53,13 +55,6 @@
         let jumpVelocity = 0;
         let gravity = -35;
         let crouchTimer = 0;
-        let isOnPlatform = false;
-        let currentPlatformTopY = 0.75;
-        let currentPlatform = null;
-        let currentPlatformHalfDepth = 0;
-        let isDroppingFromPlatform = false;
-        let platformDropVelocity = 0;
-        let platformDropTargetY = 0.75;
 
         // オブジェクト管理
         let obstacles = [];
@@ -68,6 +63,7 @@
         // 画像パス (ガチャのターゲット画像)
         const TOROTUKI_IMG_SRC = 'torotuki.jpg';
         const BERLIN_WALL_IMG_SRC = 'BerlinWall.jpg'; // ▼ 追加: レアガチャ用ターゲット画像
+        const LOUIS16_IMG_SRC = 'revival_gacha/louis16.jpg';
 
         // BGM用
         const DEFAULT_BGM_SRC = 'bgm.mp3'; // ★デフォルトBGMのパス
@@ -94,6 +90,15 @@
             { name: 'himura.png', rarity: "通常" },
             { name: 'hesu.png', rarity: "レア" },
             { name: 'tibihitora.png', rarity: "レア" }
+        ];
+
+        const REVIVAL_SKINS = [
+            { name: 'revival_gacha/louis_napoleon.png', rarity: "復活記念", rate: 1 / 6 },
+            { name: 'revival_gacha/napoleon.png', rarity: "復活記念", rate: 1 / 6 },
+            { name: 'revival_gacha/marx.png', rarity: "復活記念", rate: 1 / 6 },
+            { name: 'revival_gacha/robespierre.png', rarity: "復活記念", rate: 1 / 6 },
+            { name: 'revival_gacha/engels.png', rarity: "復活記念", rate: 1 / 6 },
+            { name: 'revival_gacha/hage_napoleon.png', rarity: "復活記念", rate: 1 / 6 }
         ];
 
         // ==========================================
@@ -265,21 +270,6 @@
             ctx.fillRect(40, 45, 15, 25); ctx.fillRect(73, 45, 15, 25);
             ctx.beginPath(); ctx.arc(64, 85, 20, 0, Math.PI, false); ctx.stroke();
             return new THREE.CanvasTexture(canvas);
-        }
-
-        function createPlatformMaterial(color) {
-            return new THREE.MeshStandardMaterial({
-                color,
-                roughness: 0.95,
-                metalness: 0.02,
-                transparent: false,
-                opacity: 1,
-                depthWrite: true,
-                depthTest: true,
-                fog: false,
-                side: THREE.DoubleSide,
-                alphaTest: 0
-            });
         }
 
         function createStripedTexture(baseColor, stripeColor, stripeWidth = 14) {
@@ -486,57 +476,6 @@
             return group;
         }
 
-        function createDecoratedPlatform(posX, railLength) {
-            const group = new THREE.Group();
-            const deckGeo = new THREE.BoxGeometry(3.8, 0.45, railLength);
-            const deckMat = createPlatformMaterial(0xb9933a);
-            const deck = new THREE.Mesh(deckGeo, deckMat);
-            deck.position.y = 0;
-            deck.renderOrder = 10;
-            group.add(deck);
-
-            const plankTexture = createStripedTexture('#8b651f', '#d1b15a', 24);
-            const plankMat = new THREE.MeshStandardMaterial({
-                color: 0xb38c3c,
-                map: plankTexture,
-                roughness: 0.96,
-                metalness: 0.01,
-                fog: false
-            });
-            const plank = new THREE.Mesh(new THREE.BoxGeometry(3.35, 0.06, railLength - 0.25), plankMat);
-            plank.position.set(0, 0.245, 0);
-            plank.renderOrder = 11;
-            group.add(plank);
-
-            const leftRail = new THREE.Mesh(
-                new THREE.BoxGeometry(0.18, 1.2, railLength),
-                createPlatformMaterial(0x5b3a11)
-            );
-            leftRail.position.set(-1.8, 0.35, 0);
-            leftRail.renderOrder = 11;
-            group.add(leftRail);
-
-            const rightRail = leftRail.clone();
-            rightRail.position.x = 1.8;
-            group.add(rightRail);
-
-            const supportSpacing = 6;
-            for (let z = -railLength * 0.5 + 2; z < railLength * 0.5; z += supportSpacing) {
-                const support = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.35, 3.1, 0.35),
-                    createPlatformMaterial(0x6a4216)
-                );
-                support.position.set(0, -1.1, z);
-                support.renderOrder = 11;
-                group.add(support);
-            }
-
-            const groupHalfDepth = railLength * 0.5;
-            group.position.set(posX, 2.9, -50 - groupHalfDepth);
-            group.userData = { type: 'platform', isObstacle: true, halfDepth: groupHalfDepth, halfHeight: 0.225 };
-            return group;
-        }
-
         // ==========================================
         // ゲームループ
         // ==========================================
@@ -569,18 +508,7 @@
 
             player.position.x += (targetX - player.position.x) * 10 * dt;
 
-            if (isDroppingFromPlatform) {
-                platformDropVelocity += gravity * dt * 0.75;
-                player.position.y += platformDropVelocity * dt;
-                player.scale.y = THREE.MathUtils.lerp(player.scale.y, 0.78, 10 * dt);
-                if (player.position.y <= platformDropTargetY) {
-                    player.position.y = platformDropTargetY;
-                    isDroppingFromPlatform = false;
-                    platformDropVelocity = 0;
-                    player.scale.y = 1.0;
-                    if (player.material) player.material.needsUpdate = true;
-                }
-            } else if (isJumping) {
+            if (isJumping) {
                 player.position.y += jumpVelocity * dt;
                 jumpVelocity += gravity * dt;
 
@@ -618,7 +546,6 @@
                 if (!isCrouching) player.scale.y = 1.0;
             }
 
-            handlePlatformLanding();
             player.lookAt(camera.position);
 
             if (Math.random() < 0.025) {
@@ -640,14 +567,7 @@
                     }
                 }
 
-                const removalZ = obj.userData.type === 'platform'
-                    ? obj.position.z - (obj.userData.halfDepth || 6)
-                    : obj.position.z;
-
-                if (removalZ > 5) {
-                    if (obj === currentPlatform) {
-                        beginPlatformDrop(0.75);
-                    }
+                if (obj.position.z > 5) {
                     scene.remove(obj);
                     obstacles.splice(i, 1);
                 }
@@ -689,10 +609,11 @@
             } else if (typeRand < 0.85) {
                 type = 'pillar';
                 mesh = createDecoratedPillar(posX);
-            } else {
-                const railLength = 18 + Math.floor(Math.random() * 3) * 6;
-                type = 'platform';
-                mesh = createDecoratedPlatform(posX, railLength);
+            }
+            // 木の足場は削除し、残りの出現枠は柱に統合する。
+            else {
+                type = 'pillar';
+                mesh = createDecoratedPillar(posX);
             }
 
             // 履歴を更新
@@ -701,110 +622,9 @@
                 lastObstacleTypes.shift();
             }
 
-            if (type !== 'platform') {
-                mesh.userData = { type: type, isObstacle: true };
-            }
+            mesh.userData = { type: type, isObstacle: true };
             scene.add(mesh);
             obstacles.push(mesh);
-        }
-
-        function isPlayerOverPlatform(obj) {
-            const halfDepth = obj.userData.halfDepth || 6;
-            const halfWidth = 1.8;
-            return (
-                Math.abs(obj.position.x - player.position.x) <= halfWidth &&
-                player.position.z >= obj.position.z - halfDepth &&
-                player.position.z <= obj.position.z + halfDepth
-            );
-        }
-
-        function beginPlatformDrop(targetY = 0.75) {
-            if (isDroppingFromPlatform) return;
-            isOnPlatform = false;
-            currentPlatform = null;
-            currentPlatformTopY = targetY;
-            currentPlatformHalfDepth = 0;
-            isDroppingFromPlatform = true;
-            platformDropVelocity = Math.min(platformDropVelocity, 0);
-            platformDropTargetY = targetY;
-            isJumping = false;
-            jumpVelocity = 0;
-        }
-
-        function findNearbyPlatform(laneX, playerZ) {
-            let best = null;
-            let bestScore = Infinity;
-
-            for (const obj of obstacles) {
-                if (obj.userData.type !== 'platform') continue;
-                const halfDepth = obj.userData.halfDepth || 6;
-                const halfWidth = 2.5;
-                const withinLane = Math.abs(obj.position.x - laneX) <= halfWidth;
-                const withinZ = playerZ >= obj.position.z - halfDepth && playerZ <= obj.position.z + halfDepth;
-                if (!withinLane || !withinZ) continue;
-
-                const score = Math.abs(obj.position.x - laneX) + Math.abs(playerZ - obj.position.z) * 0.2;
-                if (score < bestScore) {
-                    best = obj;
-                    bestScore = score;
-                }
-            }
-
-            return best;
-        }
-
-        function handlePlatformLanding() {
-            if (isDroppingFromPlatform) return;
-
-            if (isJumping && jumpVelocity <= 0) {
-                for (const obj of obstacles) {
-                    if (obj.userData.type !== 'platform') continue;
-                    const halfDepth = obj.userData.halfDepth || 6;
-                    if (!isPlayerOverPlatform(obj)) continue;
-
-                    const topY = obj.position.y + (obj.userData.halfHeight || 0.225) + 0.75;
-                    const fallingTowardTop = player.position.y >= topY - 1.8 && player.position.y <= topY + 1.2;
-                    if (fallingTowardTop) {
-                        isOnPlatform = true;
-                        currentPlatform = obj;
-                        currentPlatformTopY = topY;
-                        currentPlatformHalfDepth = halfDepth;
-                        player.position.y = topY;
-                        isJumping = false;
-                        jumpVelocity = 0;
-                        break;
-                    }
-                }
-
-            }
-
-            if (isOnPlatform && currentPlatform) {
-                const targetPlatform = findNearbyPlatform(targetX, player.position.z);
-                if (targetPlatform && targetPlatform !== currentPlatform && Math.abs(targetPlatform.position.x - player.position.x) <= 3.0) {
-                    currentPlatform = targetPlatform;
-                    currentPlatformHalfDepth = targetPlatform.userData.halfDepth || 6;
-                    const topY = targetPlatform.position.y + (targetPlatform.userData.halfHeight || 0.225) + 0.75;
-                    currentPlatformTopY = topY;
-                    player.position.y = topY;
-                    player.scale.y = 1.0;
-                }
-
-                currentPlatformTopY = currentPlatform.position.y + (currentPlatform.userData.halfHeight || 0.225) + 0.75;
-                player.position.y = currentPlatformTopY;
-                player.scale.y = 1.0;
-                if (!isPlayerOverPlatform(currentPlatform)) {
-                    const adjacent = findNearbyPlatform(targetX, player.position.z);
-                    if (adjacent && adjacent !== currentPlatform && Math.abs(adjacent.position.x - player.position.x) <= 3.0) {
-                        currentPlatform = adjacent;
-                        currentPlatformHalfDepth = adjacent.userData.halfDepth || 6;
-                        currentPlatformTopY = adjacent.position.y + (adjacent.userData.halfHeight || 0.225) + 0.75;
-                        player.position.y = currentPlatformTopY;
-                        player.scale.y = 1.0;
-                    } else {
-                        beginPlatformDrop(0.75);
-                    }
-                }
-            }
         }
 
         // ==========================================
@@ -831,8 +651,6 @@
                 }
             } else if (type === 'pillar') {
                 gameOver();
-            } else if (type === 'platform') {
-                // 足場は障害物ではなく乗れる地形なので、接触しても何もしない
             }
         }
 
@@ -845,12 +663,6 @@
                 if (Math.abs(obj.position.x - x) > 0.9) continue;
                 if (Math.abs(obj.position.z - spawnZ) < minGapZ) return true;
 
-                if (obj.userData.type === 'platform') {
-                    const halfDepth = obj.userData.halfDepth || 6;
-                    if (spawnZ >= obj.position.z - halfDepth - 2 && spawnZ <= obj.position.z + halfDepth + 2) {
-                        return true;
-                    }
-                }
             }
             return false;
         }
@@ -919,9 +731,6 @@
 
         function doJump() {
             if (!isJumping) {
-                isOnPlatform = false;
-                currentPlatform = null;
-                currentPlatformHalfDepth = 0;
                 isJumping = true;
                 jumpVelocity = 12;
             }
@@ -1041,9 +850,6 @@
             isPaused = false; 
             jumpVelocity = 0;
             crouchTimer = 0;
-            isOnPlatform = false;
-            currentPlatform = null;
-            currentPlatformTopY = 0.75;
             
             document.getElementById('score-val').innerText = score;
             document.getElementById('distance-val').innerText = Math.floor(distance);
@@ -1241,6 +1047,7 @@
             let cost = 0;
 
             pickaxe.style.opacity = '0';
+            pickaxe.innerText = type === 'revival' ? '🪓' : '⛏️';
             pickaxe.style.transform = 'translate(0, 0) rotate(0deg)';
 
             if (type === 'normal') {
@@ -1256,15 +1063,22 @@
                 gachaTitle.innerText = "資本主義の奴隷ガチャ";
                 img.src = BERLIN_WALL_IMG_SRC; // 新しいターゲット画像
                 gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
-                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br><span style="color: #f00;">レア同志以外は虚無（何も得られない）</span>`;
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br><span style="color: #ff0;">はずれなし・レア同志確定</span>`;
                 gachaButton.onclick = runRareGacha;
             } else if (type === 'schlieffen') {
-                cost = 30;
-                gachaTitle.innerText = "Schlieffen-Plan";
+                cost = SCHLIEFFEN_GACHA_COST;
+                gachaTitle.innerText = "記念ガチャ - Schlieffen-Plan";
                 img.src = 'schlieffen.png';
                 gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
-                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br>期間限定同志`;
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br><span style="color: #ff0;">はずれなし・記念同志確定</span>`;
                 gachaButton.onclick = runSchlieffenGacha;
+            } else if (type === 'revival') {
+                cost = REVIVAL_GACHA_COST;
+                gachaTitle.innerText = "復活記念ガチャ";
+                img.src = LOUIS16_IMG_SRC;
+                gachaButton.innerText = `ピッケル投擲 (${cost}個消費)`;
+                gachaCostText.innerHTML = `1回: 無敵ボール ${cost}個<br><span style="color: #ff0;">はずれなし・復活記念同志確定</span>`;
+                gachaButton.onclick = runRevivalGacha;
             } else {
                 // ここには来ない想定
                 return;
@@ -1298,6 +1112,8 @@
                 runRareGacha();
             } else if (currentGachaType === 'schlieffen') {
                 runSchlieffenGacha();
+            } else if (currentGachaType === 'revival') {
+                runRevivalGacha();
             }
         }
 
@@ -1319,7 +1135,6 @@
             
             const pickaxe = document.getElementById('pickaxe');
             const imgContainer = document.getElementById('torotuki-container');
-            
             pickaxe.style.opacity = '1';
             pickaxe.style.top = '-50px';
             pickaxe.style.right = '-50px';
@@ -1406,13 +1221,14 @@
                         let hit = false;
                         const rand = Math.random();
                         let cumulativeRate = 0.0;
+                        const totalRate = RARE_SKINS.reduce((sum, rare) => sum + rare.rate, 0);
                         
                         // ★修正★: トロツキー(torotuki)を除外するフィルタを削除し、排出可能にしました。
                         // const rareSkinsExcludingTrotsky = RARE_SKINS.filter(s => s.name !== TOROTUKI_IMG_SRC); 
 
                         // レアスキン判定
                         for (const rare of RARE_SKINS) { // 全てのレアスキンから判定
-                            cumulativeRate += rare.rate;
+                            cumulativeRate += rare.rate / totalRate;
                             if (rand < cumulativeRate) {
                                 newSkin = rare.name;
                                 if (ownedSkins.has(newSkin)) {
@@ -1427,9 +1243,17 @@
                             }
                         }
 
-                        // 虚無判定 (レアスキンにヒットしなかった場合)
+                        // 浮動小数点の境界でも、最後の枠を救済してはずれを発生させない。
                         if (!hit) {
-                            resultText = `<span style="color: #aaa;">虚無... 資本主義の奴隷からは何も得られませんでした...</span>`;
+                            const rare = RARE_SKINS[RARE_SKINS.length - 1];
+                            newSkin = rare.name;
+                            if (ownedSkins.has(newSkin)) {
+                                resultText = `★${rare.rarity}!!★ [${newSkin}] は既に所持しています`;
+                            } else {
+                                ownedSkins.add(newSkin);
+                                updateSkinSelectorUI();
+                                resultText = `<span style="color: #f0f;">★★★${rare.rarity}同志 [${newSkin}] を召喚!!!★★★</span>`;
+                            }
                         }
                         
                         document.getElementById('gacha-result').innerHTML = resultText;
@@ -1445,7 +1269,7 @@
         }
 
         function runSchlieffenGacha() {
-            const cost = 30;
+            const cost = SCHLIEFFEN_GACHA_COST;
             if (mutekiBalls < cost) {
                 document.getElementById('gacha-result').innerText = "無敵ボールが足りません！";
                 return;
@@ -1481,18 +1305,11 @@
                         const rand = Math.random();
                         let cumulativeRate = 0.0;
                         
-                        const gachaPool = SCHLIEFFEN_SKINS.map(skin => {
-                            let rate = 0;
-                            if (skin.rarity === "通常") {
-                                rate = 0.2;
-                            } else if (skin.rarity === "レア") {
-                                rate = 0.1;
-                            }
-                            return { ...skin, rate };
-                        });
+                        const gachaPool = SCHLIEFFEN_SKINS.map(skin => ({ ...skin, rate: 1 }));
+                        const totalRate = gachaPool.length;
 
                         for (const skin of gachaPool) {
-                            cumulativeRate += skin.rate;
+                            cumulativeRate += skin.rate / totalRate;
                             if (rand < cumulativeRate) {
                                 newSkin = skin.name;
                                 if (ownedSkins.has(newSkin)) {
@@ -1505,6 +1322,19 @@
                                 break; 
                             }
                         }
+
+                        // 浮動小数点の境界でも、最後の記念同志を救済してはずれを発生させない。
+                        if (!newSkin) {
+                            const skin = SCHLIEFFEN_SKINS[SCHLIEFFEN_SKINS.length - 1];
+                            newSkin = skin.name;
+                            if (ownedSkins.has(newSkin)) {
+                                resultText = `★${skin.rarity}!!★ [${newSkin}] は既に所持しています`;
+                            } else {
+                                ownedSkins.add(newSkin);
+                                updateSkinSelectorUI();
+                                resultText = `<span style="color: #f0f;">★★★${skin.rarity}同志 [${newSkin}] を召喚!!!★★★</span>`;
+                            }
+                        }
                         
                         document.getElementById('gacha-result').innerHTML = resultText;
                         saveData();
@@ -1513,6 +1343,46 @@
                             gachaButton.disabled = false;
                         }
 
+                    }, 500);
+                }, 300);
+            }, 100);
+        }
+
+        function runRevivalGacha() {
+            const cost = REVIVAL_GACHA_COST;
+            if (mutekiBalls < cost) {
+                document.getElementById('gacha-result').innerText = "無敵ボールが足りません！";
+                return;
+            }
+            const gachaButton = document.getElementById('gacha-button');
+            gachaButton.disabled = true;
+            mutekiBalls -= cost;
+            updateMutekiCountUI();
+            document.getElementById('gacha-muteki-count').innerText = mutekiBalls;
+            updateAwakeningUI();
+            const pickaxe = document.getElementById('pickaxe');
+            const imgContainer = document.getElementById('torotuki-container');
+            pickaxe.innerText = '🪓';
+            pickaxe.style.opacity = '1';
+            pickaxe.style.top = '-50px';
+            pickaxe.style.right = '-50px';
+            setTimeout(() => {
+                pickaxe.style.transform = 'translate(-80px, 80px) rotate(-45deg)';
+                setTimeout(() => {
+                    imgContainer.classList.add('shake');
+                    setTimeout(() => {
+                        imgContainer.classList.remove('shake');
+                        const revival = REVIVAL_SKINS[Math.floor(Math.random() * REVIVAL_SKINS.length)];
+                        const isOwned = ownedSkins.has(revival.name);
+                        if (!isOwned) {
+                            ownedSkins.add(revival.name);
+                            updateSkinSelectorUI();
+                        }
+                        document.getElementById('gacha-result').innerHTML = isOwned
+                            ? `★復活記念★ [${revival.name}] は既に所持しています`
+                            : `<span style="color: #ff0;">★★★復活記念同志 [${revival.name}] を召喚!!!★★★</span>`;
+                        saveData();
+                        gachaButton.disabled = mutekiBalls < cost;
                     }, 500);
                 }, 300);
             }, 100);
@@ -1550,7 +1420,8 @@
             
             const defaultSkin = 'player.png';
             const rareSkinNames = RARE_SKINS.map(s => s.name);
-            const normalSkinNames = SKIN_LIST.filter(s => s !== defaultSkin && !rareSkinNames.includes(s) && s !== CUSTOM_SKIN_ID);
+            const revivalSkinNames = REVIVAL_SKINS.map(s => s.name);
+            const normalSkinNames = SKIN_LIST.filter(s => s !== defaultSkin && !rareSkinNames.includes(s) && !revivalSkinNames.includes(s) && s !== CUSTOM_SKIN_ID);
 
             let html = '';
             
@@ -1567,6 +1438,11 @@
             html += `<h3 style="color: #ffaa00;">革命的同志 (レア)</h3>`;
             RARE_SKINS.forEach(rareInfo => {
                 html += createSkinListEntry(rareInfo.name, rareInfo);
+            });
+
+            html += `<h3 style="color: #ff0;">復活記念同志</h3>`;
+            REVIVAL_SKINS.forEach(revivalInfo => {
+                html += createSkinListEntry(revivalInfo.name, revivalInfo);
             });
 
             // Normal Skins
@@ -1592,7 +1468,7 @@
                 let percent = (rareInfo.rate * 100).toFixed(3).replace(/\.?0+$/, ""); // 小数点以下を整形
                 
                 // ★修正★: 常に「レアガチャ」と表示するように条件分岐を削除
-                probabilityText = ` (${rareInfo.rarity}, レアガチャ ${percent}%)`;
+                probabilityText = ` (${rareInfo.rarity}, ${REVIVAL_SKINS.some(s => s.name === skinName) ? '復活記念ガチャ' : 'レアガチャ'} ${percent}%)`;
             
             } else if (skinName === CUSTOM_SKIN_ID) {
                 probabilityText = isCustomSkinAnimated ? " (カスタム, GIF)" : " (カスタム)";
